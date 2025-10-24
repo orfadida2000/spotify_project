@@ -3,40 +3,26 @@ import re
 from pathlib import Path
 from textwrap import dedent
 
-_BASE_TRACK_URL = "https://open.spotify.com/track/{track_id}"
-_TRACK_ID_RE = r"[A-Za-z0-9]{22}"
-_TRACK_URL_RE = re.compile(
-    r"^(?:https?://)?"  # optional scheme
-    r"open\.spotify\.com"  # exact host
-    r"/track/"  # path
-    rf"({_TRACK_ID_RE})"  # 22-char base62 track id
-    r"(?:[/?#].*)?$",  # optional extras (query/fragment/trailing slash)
-    re.I,
+from ..constants.spotify import BASE_TRACK_URL
+from ..constants.title_regex import (
+    CUT_BRACKETED_KW_RE,
+    REMIX_ANY_RE,
+    REMIX_IN_BRACKETS_LEFT_RE,
+    SPLIT_DASH_RE,
 )
-_TRACK_URI_RE = re.compile(rf"^spotify:track:{_TRACK_ID_RE}$")
-
-EM_DASHES = ("—", "–", "―")
-_DASH_CLASS = "[" + re.escape("-" + "".join(EM_DASHES)) + "]"
-
-_KW = r"(?:feat\.?|ft\.?|live|remaster(?:ed)?|radio edit|single(?: version)?|version|edit|mix|remix|acoustic|demo|instrumental|karaoke|bonus track|commentary|mono|stereo|explicit|from\s+\"[^\"]+\"|from\s+the\s+.*|deluxe(?: edition)?)"
-
-_SPLIT_DASH_RE = re.compile(rf"\s*{_DASH_CLASS}\s*")
-_CUT_BRACKETED_KW_RE = re.compile(rf"[\(\[][^\)\]]*\b{_KW}\b[^\)\]]*[\)\]].*$", re.I)
-
-_REMIX_IN_BRACKETS_LEFT_RE = re.compile(r"[\(\[][^\)\]]*\bremix\b[^\)\]]*[\)\]]", re.I)
-_REMIX_ANY_RE = re.compile(r"\bremix\b", re.I)
+from ..constants.track_regex import TRACK_URI_RE, TRACK_URL_RE
 
 
 def clean_title_for_genius(s: str) -> str:
-    parts = _SPLIT_DASH_RE.split(s, maxsplit=1)
+    parts = SPLIT_DASH_RE.split(s, maxsplit=1)
     left = parts[0]
     right = parts[1] if len(parts) > 1 else ""
 
-    remix_left = bool(_REMIX_IN_BRACKETS_LEFT_RE.search(left))
-    remix_right = bool(_REMIX_ANY_RE.search(right))
+    remix_left = bool(REMIX_IN_BRACKETS_LEFT_RE.search(left))
+    remix_right = bool(REMIX_ANY_RE.search(right))
 
-    left = _CUT_BRACKETED_KW_RE.sub("", left)
-    title = re.sub(r"\s{2,}", " ", left).strip()
+    left = CUT_BRACKETED_KW_RE.sub("", left)
+    title = re.sub(pattern=r"\s{2,}", repl=" ", string=left).strip()
 
     if remix_left or remix_right:
         title += " (Remix)"
@@ -50,11 +36,11 @@ def normalize_track_url(url: str) -> str | None:
     Returns the normalized URL if valid, else None.
     """
     url = url.strip()
-    m = _TRACK_URL_RE.fullmatch(url)
+    m = TRACK_URL_RE.fullmatch(url)
     if not m:
         return None
     track_id = m.group(1)
-    return _BASE_TRACK_URL.format(track_id=track_id)
+    return BASE_TRACK_URL.format(track_id=track_id)
 
 
 def spotify_track_url(url: str) -> str:
@@ -76,7 +62,7 @@ def normalize_track_uri(uri: str) -> str | None:
     Returns the normalized URI if valid, else None.
     """
     uri = uri.strip()
-    m = _TRACK_URI_RE.fullmatch(uri)
+    m = TRACK_URI_RE.fullmatch(uri)
     if not m:
         return None
     return uri
@@ -102,8 +88,8 @@ def spotify_track_uri_to_url(uri: str) -> str:
     uri = uri.strip()
     if not uri:
         raise ValueError("Empty URI provided.")
-    track_id = uri.rsplit(":", 1)[-1]
-    return _BASE_TRACK_URL.format(track_id=track_id)
+    track_id = uri.rsplit(sep=":", maxsplit=1)[-1]
+    return BASE_TRACK_URL.format(track_id=track_id)
 
 
 def normalize_song_title(title: str) -> str | None:
@@ -163,7 +149,7 @@ def readable_file(path: str) -> Path:
     if not p.is_file():
         raise argparse.ArgumentTypeError(f"--batch file not found: {p}")
     try:
-        with p.open("rb"):
+        with p.open(mode="rb"):
             pass
     except OSError:
         raise argparse.ArgumentTypeError(f"--batch file not readable: {p}") from None

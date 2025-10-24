@@ -7,7 +7,6 @@ import os
 
 # Import re module for regular expression operations (e.g., pattern matching in text)
 import re
-from pathlib import Path
 
 import requests
 
@@ -15,13 +14,10 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-IS_A_SHELL = False
-HOME = Path.home() if IS_A_SHELL else (Path.home() / "tools" / "a-Shell")
-ENV_PATH = (HOME / "Documents" / ".secrets" / "spotify.env").resolve()
-load_dotenv(ENV_PATH)
+from .constants.genius import GENIUS_ENV_PATH, GENIUS_TOKEN_ENV_VAR
 
-GENIUS_API_TOKEN = os.getenv("GENIUS_API_TOKEN")
-# Genius API: Retrieve Artist Information
+load_dotenv(dotenv_path=GENIUS_ENV_PATH)
+GENIUS_API_TOKEN = os.getenv(key=GENIUS_TOKEN_ENV_VAR)
 
 
 def request_artist_info(artist_name: str, page: int) -> requests.Response | None:

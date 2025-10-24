@@ -1,30 +1,24 @@
 import argparse
 import base64
 import os
-import re
-from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
 
-IS_A_SHELL = False
-HOME = Path.home() if IS_A_SHELL else (Path.home() / "tools" / "a-Shell")
-ENV_PATH = (HOME / "Documents" / ".secrets" / "spotify.env").resolve()
-load_dotenv(ENV_PATH)
+from sp2genius import DEBUG_MODE
 
-CID = os.getenv("SPOTIFY_CLIENT_ID")
-CSEC = os.getenv("SPOTIFY_CLIENT_SECRET")
-
-SP_AUTH = "https://accounts.spotify.com/api/token"
-SP_TRACK = "https://api.spotify.com/v1/tracks/{}"
-
-_TRACK_ID_RE = r"[A-Za-z0-9]{22}"
-_VALID_TRACK_URL_RE = re.compile(
-    rf"^https://open\.spotify\.com/track/({_TRACK_ID_RE})(?:[/?#].*)?$",
-    re.IGNORECASE,
+from .constants.spotify import (
+    SP_AUTH,
+    SP_TRACK,
+    SPOTIFY_ENV_PATH,
+    SPOTIFY_ID_ENV_VAR,
+    SPOTIFY_SECRET_ENV_VAR,
 )
+from .constants.track_regex import VALID_TRACK_URL_RE
 
-_DEBUG_MODE = False
+load_dotenv(dotenv_path=SPOTIFY_ENV_PATH)
+CID = os.getenv(key=SPOTIFY_ID_ENV_VAR)
+CSEC = os.getenv(key=SPOTIFY_SECRET_ENV_VAR)
 
 
 def _extract_track_id(url: str, normalized: bool) -> str | None:
@@ -47,7 +41,7 @@ def _extract_track_id(url: str, normalized: bool) -> str | None:
         # url is non-empty, so rsplit always returns at least one element
         track_id = url.rsplit("/", 1)[-1]
         return track_id
-    m = _VALID_TRACK_URL_RE.fullmatch(url)
+    m = VALID_TRACK_URL_RE.fullmatch(url)
     if not m:
         return None
     return m.group(1)
@@ -110,14 +104,14 @@ def resolve_title_artists_from_spotify_url(
         return "", []
     token = _get_token(client_id, client_secret)
     resp = requests.get(
-        SP_TRACK.format(tid),
+        SP_TRACK.format(track_id=tid),
         headers={"Authorization": f"Bearer {token}"},
         timeout=10,
     )
     resp.raise_for_status()
     data = resp.json()
-    global _DEBUG_MODE
-    if _DEBUG_MODE:
+    global DEBUG_MODE
+    if DEBUG_MODE:
         _debug_response_data(data)
     title = data.get("name", "")
     artist_lst = [a["name"] for a in data.get("artists", []) if "name" in a]
@@ -149,15 +143,13 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     try:
-        global _DEBUG_MODE
-        _DEBUG_MODE = True
+        global DEBUG_MODE
         args = parse_args()
         title, artist = resolve_title_artists_from_spotify_url(args.url, is_url_normalized=False)
         print(f"Title: {title}")
         print(f"Artist list: {artist}")
     except SystemExit:
         pass  # argparse already printed error message
-    _DEBUG_MODE = False
 
 
 if __name__ == "__main__":

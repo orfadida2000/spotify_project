@@ -1,9 +1,5 @@
-from pathlib import Path
-
-ABS_FILE_PATH = Path(__file__).resolve()
-ABS_ROOT_DIR_PATH = ABS_FILE_PATH.parent.parent
-DB_PATH = ABS_ROOT_DIR_PATH / "lyrics_db"
-DELIM = "\t"
+from ..constants.paths import DB_PATH
+from ..constants.text import DELIM
 
 
 def load_db():

@@ -1,14 +1,12 @@
 import os
-import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 from lyricsgenius import Genius
 
-ABS_FILE_PATH = Path(__file__).resolve()
-ABS_SCRIPTS_DIR_PATH = ABS_FILE_PATH.parent
-sys.path.insert(0, str(ABS_SCRIPTS_DIR_PATH))
-from sp2genius_argparse import (  # noqa: E402
+from ..constants.genius import GENIUS_ENV_PATH, GENIUS_TOKEN_ENV_VAR
+from ..spotify_title_artist_scraper import resolve_title_artists_from_spotify_url
+from .sp2genius_argparse import (
     normalize_artist_list,
     normalize_song_title,
     normalize_track_uri,
@@ -16,15 +14,10 @@ from sp2genius_argparse import (  # noqa: E402
     parse_args,
     spotify_track_uri_to_url,
 )
-from sp2genius_db import get_value_from_db, set_value_in_db  # noqa: E402
-from spotify_title_artist_scraper import resolve_title_artists_from_spotify_url  # noqa: E402
+from .sp2genius_db import get_value_from_db, set_value_in_db
 
-IS_A_SHELL = False
-HOME = Path.home() if IS_A_SHELL else (Path.home() / "tools" / "a-Shell")
-ENV_PATH = (HOME / "Documents" / ".secrets" / "genius.env").resolve()
-load_dotenv(ENV_PATH)
-
-GENIUS_API_TOKEN = os.getenv("GENIUS_API_TOKEN")
+load_dotenv(dotenv_path=GENIUS_ENV_PATH)
+GENIUS_API_TOKEN = os.getenv(key=GENIUS_TOKEN_ENV_VAR)
 
 
 def genius_url_for_title_artists(title: str, artist_lst: list[str]) -> str | None:
