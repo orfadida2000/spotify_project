@@ -4,9 +4,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 from lyricsgenius import Genius
 
-from ..constants.genius import GENIUS_ENV_PATH, GENIUS_TOKEN_ENV_VAR
-from ..spotify_title_artist_scraper import resolve_title_artists_from_spotify_url
-from .sp2genius_argparse import (
+from sp2genius.genius.constants import GENIUS_ENV_PATH, GENIUS_TOKEN_ENV_VAR
+from sp2genius.spotify.title_artist_scraper import resolve_title_artists_from_spotify_url
+
+from .argparse import (
     normalize_artist_list,
     normalize_song_title,
     normalize_track_uri,
@@ -14,13 +15,17 @@ from .sp2genius_argparse import (
     parse_args,
     spotify_track_uri_to_url,
 )
-from .sp2genius_db import get_value_from_db, set_value_in_db
+from .db import get_value_from_db, set_value_in_db
 
 load_dotenv(dotenv_path=GENIUS_ENV_PATH)
 GENIUS_API_TOKEN = os.getenv(key=GENIUS_TOKEN_ENV_VAR)
 
 
-def genius_url_for_title_artists(title: str, artist_lst: list[str]) -> str | None:
+def genius_url_for_title_artists(
+    title: str,
+    artist_lst: list[str],
+    verbose: bool = False,
+) -> str | None:
     try:
         token = GENIUS_API_TOKEN
         if not token or not title:
@@ -30,7 +35,7 @@ def genius_url_for_title_artists(title: str, artist_lst: list[str]) -> str | Non
             timeout=10,
             skip_non_songs=True,
             remove_section_headers=False,
-            verbose=False,
+            verbose=verbose,
         )
         if len(artist_lst) == 0:
             song = g.search_song(title=title, get_full_info=False)

@@ -1,7 +1,7 @@
 import re
 from typing import Final
 
-from .text import EM_DASHES
+from sp2genius.constants.text import EM_DASHES
 
 _DASH_CLASS: Final[str] = "[" + re.escape(pattern="".join(EM_DASHES)) + "]"
 # keywords used inside brackets or suffixes

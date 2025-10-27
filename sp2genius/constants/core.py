@@ -1,6 +1,6 @@
 from typing import Final
 
-from ..utils import detect_host
+from sp2genius.utils.host_detection import detect_host
 
 HOST: Final[str] = detect_host()
 if HOST == "Other":

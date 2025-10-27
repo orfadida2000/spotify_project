@@ -1,11 +1,17 @@
-from ..constants.paths import DB_PATH
-from ..constants.text import DELIM
+from sp2genius.constants.paths import DB_PATH
+from sp2genius.constants.text import DELIM
+from sp2genius.utils.path import is_readable_file, is_writable_dir
+from sp2genius.utils.typing import ReturnCode
 
 
-def load_db():
+def load_db() -> tuple[bool, dict[str, str]]:
+    exit_code, p, err = is_readable_file(DB_PATH)
+    if exit_code == ReturnCode.NOT_FOUND:
+        return False, {}
+    elif exit_code != ReturnCode.SUCCESS or p is None:
+        raise OSError(f"Failed to access lyrics database file: {err}")
+
     try:
-        if not DB_PATH.exists():
-            return (None, 1)
         data = {}
         with DB_PATH.open(mode="r", encoding="utf-8", errors="replace", newline=None) as f:
             for line in f:
@@ -23,39 +29,27 @@ def load_db():
                 k, v = line.split(DELIM, 1)
                 data[k] = v
 
-        return (data, 0)
-    except Exception:
-        return (None, 2)
+        return True, data
+    except OSError as e:
+        raise OSError("Failed to read lyrics database file") from e
 
 
 def get_value_from_db(key: str) -> str:
-    tup = load_db()
-    if tup[1] != 0:
-        return ""
-    d = tup[0]
-    return d.get(key, "")
+    _, db = load_db()
+    return db.get(key, "")
 
 
 def set_value_in_db(key: str, value: str):
-    d, exit_code = load_db()
-    if exit_code == 2:  # read error → stop
-        return
+    db_exists, db = load_db()
+    if not db_exists:
+        exit_code, p, err = is_writable_dir(DB_PATH.parent)
+        if exit_code != ReturnCode.SUCCESS or p is None:
+            raise OSError(f"lyrics database directory: {err}")
 
+    db[key] = value
     try:
-        if exit_code == 1:
-            # file missing → create new one
-            with DB_PATH.open(mode="w", encoding="utf-8", errors="strict", newline="\n") as f:
-                f.write(f"{key}{DELIM}{value}\n")
-            return
-    except Exception:
-        return
-
-    try:
-        d = d if isinstance(d, dict) else {}
-        d[key] = value
-        # rewrite entire file
         with DB_PATH.open(mode="w", encoding="utf-8", errors="strict", newline="\n") as f:
-            for k, v in d.items():
+            for k, v in db.items():
                 f.write(f"{k}{DELIM}{v}\n")
-    except Exception:
-        return
+    except OSError as e:
+        raise OSError("Failed to write lyrics database file") from e

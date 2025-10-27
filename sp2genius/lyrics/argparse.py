@@ -3,14 +3,15 @@ import re
 from pathlib import Path
 from textwrap import dedent
 
-from ..constants.spotify import BASE_TRACK_URL
-from ..constants.title_regex import (
+from sp2genius.spotify.constants import BASE_TRACK_URL
+from sp2genius.spotify.regex.title import (
     CUT_BRACKETED_KW_RE,
     REMIX_ANY_RE,
     REMIX_IN_BRACKETS_LEFT_RE,
     SPLIT_DASH_RE,
 )
-from ..constants.track_regex import TRACK_URI_RE, TRACK_URL_RE
+from sp2genius.spotify.regex.url import TRACK_URI_RE, TRACK_URL_RE
+from sp2genius.utils.path import is_readable_file
 
 
 def clean_title_for_genius(s: str) -> str:
@@ -145,14 +146,9 @@ def readable_file(path: str) -> Path:
     Return the path as a Path object if valid.
     Otherwise raise argparse.ArgumentTypeError.
     """
-    p = Path(path.strip())
-    if not p.is_file():
-        raise argparse.ArgumentTypeError(f"--batch file not found: {p}")
-    try:
-        with p.open(mode="rb"):
-            pass
-    except OSError:
-        raise argparse.ArgumentTypeError(f"--batch file not readable: {p}") from None
+    is_readable, p, err = is_readable_file(path)
+    if not is_readable or p is None:
+        raise argparse.ArgumentTypeError(f"--batch {err}")
     return p
 
 

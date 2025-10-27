@@ -7,14 +7,14 @@ from dotenv import load_dotenv
 
 from sp2genius import DEBUG_MODE
 
-from .constants.spotify import (
+from .constants import (
     SP_AUTH,
     SP_TRACK,
     SPOTIFY_ENV_PATH,
     SPOTIFY_ID_ENV_VAR,
     SPOTIFY_SECRET_ENV_VAR,
 )
-from .constants.track_regex import VALID_TRACK_URL_RE
+from .regex.url import VALID_TRACK_URL_RE
 
 load_dotenv(dotenv_path=SPOTIFY_ENV_PATH)
 CID = os.getenv(key=SPOTIFY_ID_ENV_VAR)

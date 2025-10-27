@@ -9,7 +9,7 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
-from .constants.spotify import CHARTS_URL
+from .constants import CHARTS_URL
 
 
 def fetch_html(url: str) -> str:
@@ -75,7 +75,7 @@ def parse_args():
         help=f"url to the HTML file (default: {CHARTS_URL}",
     )
     p.add_argument(
-        "-o", "--outdir", help="Output directory (default: current directory)", default="."
+        "-o", "--outdir", help="Output directory (default: current working directory)", default="."
     )
     return p.parse_args()
 

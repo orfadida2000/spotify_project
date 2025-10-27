@@ -14,7 +14,7 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-from .constants.genius import GENIUS_ENV_PATH, GENIUS_TOKEN_ENV_VAR
+from .constants import BASE_API_URL, GENIUS_ENV_PATH, GENIUS_TOKEN_ENV_VAR
 
 load_dotenv(dotenv_path=GENIUS_ENV_PATH)
 GENIUS_API_TOKEN = os.getenv(key=GENIUS_TOKEN_ENV_VAR)
@@ -36,14 +36,11 @@ def request_artist_info(artist_name: str, page: int) -> requests.Response | None
         print("Genius API token not found. Please set the GENIUS_API_TOKEN environment variable.")
         return None
 
-    # Base URL for the Genius API
-    base_url = "https://api.genius.com"
-
     # Authorization header with the Genius API token (replace GENIUS_API_TOKEN with your actual token)
     headers = {"Authorization": "Bearer " + GENIUS_API_TOKEN}
 
     # Construct the search URL endpoint for the Genius API
-    search_url = base_url + "/search"
+    search_url = BASE_API_URL + "/search"
 
     # Define the parameters for the API request (artist name, results per page, page number)
     params = {"q": artist_name, "per_page": 10, "page": page}
