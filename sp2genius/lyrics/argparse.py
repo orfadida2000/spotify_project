@@ -3,6 +3,8 @@ import re
 from pathlib import Path
 from textwrap import dedent
 
+from validators import url as is_valid_url
+
 from sp2genius.spotify.constants import BASE_TRACK_URL
 from sp2genius.spotify.regex.title import (
     CUT_BRACKETED_KW_RE,
@@ -12,6 +14,42 @@ from sp2genius.spotify.regex.title import (
 )
 from sp2genius.spotify.regex.url import TRACK_URI_RE, TRACK_URL_RE
 from sp2genius.utils.path import is_readable_file
+
+
+def general_url_normalization(url: str) -> str:
+    """
+    Normalize, trim.
+    Validate:
+    - not empty
+    - scheme https
+    - no IPv4
+    - no IPv6
+    - no port
+    - syntactically valid URL
+    If scheme is missing, assumes https.
+    Returns cleaned URL or raises ValueError.
+    """
+    if not isinstance(url, str):
+        raise ValueError("URL must be a string")
+
+    url = url.strip()
+    if not url:
+        raise ValueError("URL is an empty string")
+    if url.find("://") == -1:
+        url = f"https://{url}"
+
+    valid = is_valid_url(
+        url,
+        skip_ipv6_addr=True,
+        skip_ipv4_addr=True,
+        may_have_port=False,
+        validate_scheme=lambda s: s == "https",
+    )
+
+    if not valid:
+        raise ValueError(f"URL is not valid: {valid}")
+
+    return url
 
 
 def clean_title_for_genius(s: str) -> str:
@@ -30,16 +68,16 @@ def clean_title_for_genius(s: str) -> str:
     return title
 
 
-def normalize_track_url(url: str) -> str | None:
+def normalize_track_url(url: str) -> str:
     """
     Normalize a Spotify track URL to the form 'https://open.spotify.com/track/<track_id>'.
     Accepts URLs with or without scheme and with optional query/fragment.
-    Returns the normalized URL if valid, else None.
+    Returns the normalized URL if valid, else raises ValueError.
     """
-    url = url.strip()
+    url = general_url_normalization(url)
     m = TRACK_URL_RE.fullmatch(url)
     if not m:
-        return None
+        raise ValueError(f"URL is not a valid Spotify track URL: {url}")
     track_id = m.group(1)
     return BASE_TRACK_URL.format(track_id=track_id)
 
@@ -51,21 +89,22 @@ def spotify_track_url(url: str) -> str:
     Accepts with or without scheme and with optional query/fragment.
     Otherwise raises argparse.ArgumentTypeError.
     """
-    norm_url = normalize_track_url(url)
-    if not norm_url:
-        raise argparse.ArgumentTypeError("--url must be a valid Spotify track URL.")
+    try:
+        norm_url = normalize_track_url(url)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"--url must be a valid Spotify track URL: {e}") from None
     return norm_url
 
 
-def normalize_track_uri(uri: str) -> str | None:
+def normalize_track_uri(uri: str) -> str:
     """
     Normalize a Spotify track URI to the form 'spotify:track:<track_id>'.
-    Returns the normalized URI if valid, else None.
+    Returns the normalized URI if valid, else raises ValueError.
     """
     uri = uri.strip()
     m = TRACK_URI_RE.fullmatch(uri)
     if not m:
-        return None
+        raise ValueError(f"URI is not a valid Spotify track URI: {uri}")
     return uri
 
 
@@ -75,9 +114,10 @@ def spotify_track_uri(uri: str) -> str:
     Return 'spotify:track:<track_id>' if URI is a valid Spotify track URI.
     Otherwise raises argparse.ArgumentTypeError.
     """
-    norm_uri = normalize_track_uri(uri)
-    if not norm_uri:
-        raise argparse.ArgumentTypeError("--uri must be a valid Spotify track URI.")
+    try:
+        norm_uri = normalize_track_uri(uri)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"--uri must be a valid Spotify track URI: {e}") from None
     return norm_uri
 
 
@@ -93,16 +133,18 @@ def spotify_track_uri_to_url(uri: str) -> str:
     return BASE_TRACK_URL.format(track_id=track_id)
 
 
-def normalize_song_title(title: str) -> str | None:
+def normalize_song_title(title: str) -> str:
     """
     Normalize a song title by stripping leading/trailing whitespace.
-    Returns the stripped title if non-empty, else None.
+    Returns the stripped title if non-empty, else raises ValueError.
     """
     title = title.strip()
     if not title:
-        return None
+        raise ValueError("Empty title provided.")
     title = clean_title_for_genius(title)
-    return title if title else None
+    if not title:
+        raise ValueError("Title is empty after cleaning.")
+    return title
 
 
 def song_title(title: str) -> str:
@@ -112,9 +154,10 @@ def song_title(title: str) -> str:
     Return stripped string if non empty.
     Otherwise raise argparse.ArgumentTypeError.
     """
-    norm_title = normalize_song_title(title)
-    if not norm_title:
-        raise argparse.ArgumentTypeError("--title must be a non-empty string.")
+    try:
+        norm_title = normalize_song_title(title)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"--title must be a non-empty string: {e}") from None
     return norm_title
 
 
@@ -148,7 +191,7 @@ def readable_file(path: str) -> Path:
     """
     is_readable, p, err = is_readable_file(path)
     if not is_readable or p is None:
-        raise argparse.ArgumentTypeError(f"--batch {err}")
+        raise argparse.ArgumentTypeError(f"--batch must be a readable file: {err}")
     return p
 
 
@@ -166,7 +209,7 @@ def build_parser() -> argparse.ArgumentParser:
 
       2) --url SPOTIFY_TRACK_URL
          • A single Spotify track URL.
-         • Must be a full URL, with or without scheme, may include query/fragment parts and host is case-insensitive.
+         • Must be a full URL, with or without scheme, may include query/fragment parts, host is case-insensitive.
          • A valid URL's host must be exactly "open.spotify.com" and path must start with "/track/" followed by a 22-character base62 track ID.
          • Example: --url "https://open.spotify.com/track/5UsLjwBaTHBX4ektWIr4XX"
 

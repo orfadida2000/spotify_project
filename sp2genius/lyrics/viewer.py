@@ -25,11 +25,11 @@ def genius_url_for_title_artists(
     title: str,
     artist_lst: list[str],
     verbose: bool = False,
-) -> str | None:
+) -> str:
     try:
         token = GENIUS_API_TOKEN
         if not token or not title:
-            return None
+            raise ValueError("Missing Genius API token or empty title.")
         g = Genius(
             access_token=token,
             timeout=10,
@@ -39,52 +39,43 @@ def genius_url_for_title_artists(
         )
         if len(artist_lst) == 0:
             song = g.search_song(title=title, get_full_info=False)
-            return getattr(song, "url", None) if song else None
+            url = getattr(song, "url", None) if song else None
+            if not url:
+                raise ValueError("404 could not find song URL on Genius.")
+            return url
         for artist in artist_lst:
             song = g.search_song(title=title, artist=artist, get_full_info=False)
-            if song:
-                return song.url
-        return None
-    except Exception:
-        return None
+            url = getattr(song, "url", None) if song else None
+            if url:
+                return url
+        raise ValueError("404 could not find song URL on Genius.")
+    except Exception as e:
+        raise ValueError(f"Genius API error: {e}") from None
 
 
-def process_url_mode(spotify_url: str) -> str | None:
-    try:
-        genius_url = get_value_from_db(spotify_url)
-        if genius_url:
-            return genius_url
-        title, artist_lst = resolve_title_artists_from_spotify_url(spotify_url)
-        if not title or not artist_lst:
-            return None
-        title = normalize_song_title(title)
-        if not title:
-            return None
-        genius_url = genius_url_for_title_artists(title, artist_lst)
-        if genius_url:
-            set_value_in_db(spotify_url, genius_url)
-            return genius_url
-        return None
-    except Exception:
-        return None
+def process_url_mode(spotify_url: str) -> str:
+    genius_url = get_value_from_db(spotify_url)
+    if genius_url:
+        return genius_url
+    title, artist_lst = resolve_title_artists_from_spotify_url(spotify_url)
+    if not title or not artist_lst:
+        raise ValueError("Could not resolve title and/or artist from Spotify URL.")
+    title = normalize_song_title(title)
+    if not title:
+        raise ValueError("Invalid (empty) title after normalization.")
+    genius_url = genius_url_for_title_artists(title, artist_lst)
+    set_value_in_db(spotify_url, genius_url)
+    return genius_url
 
 
-def process_uri_mode(spotify_uri: str) -> str | None:
-    try:
-        spotify_url = spotify_track_uri_to_url(spotify_uri)
-        return process_url_mode(spotify_url)
-    except ValueError:
-        return None
+def process_uri_mode(spotify_uri: str) -> str:
+    spotify_url = spotify_track_uri_to_url(spotify_uri)
+    return process_url_mode(spotify_url)
 
 
-def process_title_mode(title: str, artist_lst: list[str]) -> str | None:
-    try:
-        genius_url = genius_url_for_title_artists(title, artist_lst)
-        if genius_url:
-            return genius_url
-        return None
-    except Exception:
-        return None
+def process_title_mode(title: str, artist_lst: list[str]) -> str:
+    genius_url = genius_url_for_title_artists(title, artist_lst)
+    return genius_url
 
 
 def process_line(line: str) -> str:
@@ -96,38 +87,42 @@ def process_line(line: str) -> str:
     genius_url = None
     if line.startswith("url="):
         spotify_url = line.split("=", 1)[1]
-        spotify_url = normalize_track_url(spotify_url)
-        if not spotify_url:
-            return line + " - error: invalid Spotify URL\n"
-        genius_url = process_url_mode(spotify_url)
+        try:
+            spotify_url = normalize_track_url(spotify_url)
+            genius_url = process_url_mode(spotify_url)
+        except Exception as e:
+            return line + f" - error: {e}\n"
     elif line.startswith("uri="):
         spotify_uri = line.split("=", 1)[1]
-        spotify_uri = normalize_track_uri(spotify_uri)
-        if not spotify_uri:
-            return line + " - error: invalid Spotify URI\n"
-        genius_url = process_uri_mode(spotify_uri)
+        try:
+            spotify_uri = normalize_track_uri(spotify_uri)
+            genius_url = process_uri_mode(spotify_uri)
+        except Exception as e:
+            return line + f" - error: {e}\n"
     elif line.startswith("title="):
         parts = [part.strip() for part in line.split("\t", 1)]
         title = parts[0].split("=", 1)[1]
-        title = normalize_song_title(title)
-        if not title:
-            return line + " - error: invalid (empty) title\n"
+        try:
+            title = normalize_song_title(title)
+        except Exception as e:
+            return line + f" - error: {e}\n"
         artist_lst = []
         if len(parts) == 2 and parts[1]:
             if not parts[1].startswith("artist="):
                 return line + " - error: invalid manual mode line format\n"
             artists = parts[1].split("=", 1)[1]
             artist_lst = normalize_artist_list(artists)
-        genius_url = process_title_mode(title, artist_lst)
+        try:
+            genius_url = process_title_mode(title, artist_lst)
+        except Exception as e:
+            return line + f" - error: {e}\n"
     else:
         return line + " - error: invalid line format\n"
 
-    if genius_url:
-        return line + f" - success: {genius_url}\n"
-    return line + " - error: 404 not found\n"
+    return line + f" - success: {genius_url}\n"
 
 
-def process_batch_mode(file_path: Path) -> Path | None:
+def process_batch_mode(file_path: Path) -> Path:
     try:
         output_path = file_path.with_suffix(suffix=".out.txt")
         with (
@@ -137,8 +132,8 @@ def process_batch_mode(file_path: Path) -> Path | None:
             for line in i_file:
                 line = process_line(line)
                 o_file.write(line)
-    except OSError:
-        return None
+    except OSError as e:
+        raise ValueError(f"File error: {e}") from None
     return output_path
 
 
@@ -194,29 +189,32 @@ def test_while_yes():
 def main():
     try:
         args = parse_args()
-    except SystemExit:
-        return  # argparse already printed error message
-
-    if args.batch:
-        output_path = process_batch_mode(args.batch)
-        if output_path:
-            abs_output_path = output_path.resolve()
-            print(f"Success: output written to {abs_output_path}")
-        else:
-            print("Error: could not process batch file.")
+    except Exception as e:
+        print(f"Error: {e}")
         return
 
-    if args.url:
-        genius_url = process_url_mode(args.url)
-    elif args.uri:
-        genius_url = process_uri_mode(args.uri)
-    else:  # args.title must be defined
-        genius_url = process_title_mode(args.title, args.artist)
+    if args.batch:
+        try:
+            output_path = process_batch_mode(args.batch)
+            abs_output_path = output_path.resolve()
+        except Exception as e:
+            print(f"Error: could not process batch file: {e}")
+            return
 
-    if genius_url:
-        print(f"Success: {genius_url}")
-    else:
-        print("Error: 404 not found")
+        print(f"Success: output written to {abs_output_path}")
+
+    try:
+        if args.url:
+            genius_url = process_url_mode(args.url)
+        elif args.uri:
+            genius_url = process_uri_mode(args.uri)
+        else:  # args.title must be defined
+            genius_url = process_title_mode(args.title, args.artist)
+    except Exception as e:
+        print(f"Error: {e}")
+        return
+
+    print(f"Success: {genius_url}")
 
 
 if __name__ == "__main__":

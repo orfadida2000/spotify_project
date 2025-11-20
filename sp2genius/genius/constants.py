@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Final
 
@@ -15,8 +16,13 @@ if _exit_code != ReturnCode.SUCCESS or _temp_path is None:
 GENIUS_ENV_PATH: Final[Path] = _temp_path
 BASE_API_URL: Final[str] = "https://api.genius.com"
 
+GENIUS_LYRICS_URL_RE = re.compile(
+    r"^https://genius\.com/[A-Za-z]+(?:-[A-Za-z]+)*-lyrics$"
+)
+
 __all__ = [
     "GENIUS_TOKEN_ENV_VAR",
     "GENIUS_ENV_PATH",
     "BASE_API_URL",
+    "GENIUS_LYRICS_URL_RE"
 ]

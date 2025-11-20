@@ -1,6 +1,10 @@
 # -------------------------------------
+# git
+.git/
+
+# -------------------------------------
 # Byte-compiled / optimized files
-__pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 
@@ -48,6 +52,5 @@ ipython_config.py
 
 # -------------------------------------
 # Misc
-lyrics_db
 tests/
 

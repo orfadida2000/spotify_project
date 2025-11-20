@@ -58,7 +58,7 @@ def detect_host_verbose() -> str:
         if not found:
             print("No WSL indicators found; assuming standard Linux environment")
             found = "Linux"
-    elif platform_specs["system"] == "darwin":
+    elif platform_specs["system"] in  ["darwin", "ios", "macos", "ipados"]:
         print("Detected Darwin (macOS) environment - checking for a-Shell...")
 
         # a-Shell (iOS sandbox): HOME under /private/var/mobile/…
@@ -107,7 +107,7 @@ def detect_host() -> str:
         ):
             return "WSL"
         return "Linux"
-    elif platform_specs["system"] == "darwin":
+    elif platform_specs["system"] in  ["darwin", "ios", "macos", "ipados"]:
         # a-Shell (iOS sandbox): HOME under /private/var/mobile/…
         if (
             home.startswith("/private/var/mobile/Containers")
@@ -117,3 +117,11 @@ def detect_host() -> str:
         return "macOS"
 
     return "Other"
+
+
+def main():
+    print(detect_host())
+
+
+if __name__ == "__main__":
+    main()
