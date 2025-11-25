@@ -10,6 +10,7 @@
     "dotenv",
     "ELOOP",
     "ENAMETOOLONG",
+    "executescript",
     "flac",
     "ipados",
     "lyricsgenius",

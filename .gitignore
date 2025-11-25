@@ -51,6 +51,8 @@ ipython_config.py
 **/*[Pp]lots*/
 
 # -------------------------------------
-# Misc
+# Project specific ignores
 tests/
+**/.spotify_token_cache.json
+**/*.env
 

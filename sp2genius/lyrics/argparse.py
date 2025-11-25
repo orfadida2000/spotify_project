@@ -2,10 +2,10 @@ import argparse
 import re
 from pathlib import Path
 from textwrap import dedent
+from typing import Final
 
 from validators import url as is_valid_url
 
-from sp2genius.spotify.constants import BASE_TRACK_URL
 from sp2genius.spotify.regex.title import (
     CUT_BRACKETED_KW_RE,
     REMIX_ANY_RE,
@@ -14,6 +14,8 @@ from sp2genius.spotify.regex.title import (
 )
 from sp2genius.spotify.regex.url import TRACK_URI_RE, TRACK_URL_RE
 from sp2genius.utils.path import is_readable_file
+
+BASE_TRACK_URL: Final[str] = "https://open.spotify.com/track/{track_id}"
 
 
 def general_url_normalization(url: str) -> str:

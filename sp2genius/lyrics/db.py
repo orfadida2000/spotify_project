@@ -1,5 +1,6 @@
 from sp2genius.constants.paths import DB_PATH
 from sp2genius.constants.text import DELIM
+from sp2genius.spotify.api.client import resolve_title_artists_from_spotify_url
 from sp2genius.utils.path import is_readable_file, is_writable_dir
 from sp2genius.utils.typing import ReturnCode
 
@@ -53,3 +54,11 @@ def set_value_in_db(key: str, value: str):
                 f.write(f"{k}{DELIM}{v}\n")
     except OSError as e:
         raise OSError("Failed to write lyrics database file") from e
+
+
+def add_properties_to_db(url: str):
+    title, artist_lst = resolve_title_artists_from_spotify_url(url)
+    if not title or not artist_lst:
+        raise ValueError("Could not resolve title and artists from Spotify URL")
+    set_value_in_db(f"{url}|title", title)
+    set_value_in_db(f"{url}|artists", ",".join(artist_lst))

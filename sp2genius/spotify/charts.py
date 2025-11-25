@@ -5,11 +5,12 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Final
 
 import requests
 from bs4 import BeautifulSoup
 
-from .constants import CHARTS_URL
+CHARTS_URL: Final[str] = "https://kworb.net/spotify/listeners.html"
 
 
 def fetch_html(url: str) -> str:

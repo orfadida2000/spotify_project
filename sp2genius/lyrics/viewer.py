@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from lyricsgenius import Genius
 
 from sp2genius.genius.constants import GENIUS_ENV_PATH, GENIUS_TOKEN_ENV_VAR
-from sp2genius.spotify.title_artist_scraper import resolve_title_artists_from_spotify_url
+from sp2genius.spotify.api.client import resolve_title_artists_from_spotify_url
 
 from .argparse import (
     normalize_artist_list,

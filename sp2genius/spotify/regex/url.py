@@ -4,10 +4,6 @@ from typing import Final
 # Regular expressions for Spotify track identifiers
 _TRACK_ID_RE: Final[str] = r"[A-Za-z0-9]{22}"
 
-VALID_TRACK_URL_RE: Final[re.Pattern[str]] = re.compile(
-    pattern=rf"^https://open\.spotify\.com/track/({_TRACK_ID_RE})(?:[/?#].*)?$",
-    flags=re.I,
-)
 TRACK_URL_RE: Final[re.Pattern[str]] = re.compile(
     pattern=r"^(?:https?://)?"  # optional scheme
     r"open\.spotify\.com"  # exact host
@@ -19,7 +15,6 @@ TRACK_URL_RE: Final[re.Pattern[str]] = re.compile(
 TRACK_URI_RE: Final[re.Pattern[str]] = re.compile(pattern=rf"^spotify:track:{_TRACK_ID_RE}$")
 
 __all__ = [
-    "VALID_TRACK_URL_RE",
     "TRACK_URL_RE",
     "TRACK_URI_RE",
 ]
