@@ -7,8 +7,8 @@ from pathlib import Path
 from tqdm import tqdm
 
 from sp2genius.constants.text import EM_DASHES
+from sp2genius.genius.api.client import genius_url_for_title_artists
 from sp2genius.lyrics.argparse import normalize_artist_list, normalize_song_title
-from sp2genius.lyrics.viewer import genius_url_for_title_artists
 from sp2genius.utils.path import (
     is_dir,
     is_file,

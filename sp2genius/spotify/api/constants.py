@@ -1,5 +1,6 @@
 # Regular expressions for Spotify track identifiers
 import re
+from enum import StrEnum
 from pathlib import Path
 from typing import Final
 
@@ -12,7 +13,6 @@ SPOTIFY_TRACK_URL_RE: Final[re.Pattern[str]] = re.compile(
     f"^https://open.spotify.com/track/({SPOTIFY_ID_RE.pattern})$"
 )
 BASE_API_URL: Final[str] = "https://api.spotify.com/v1"
-INCLUDE_GROUPS: Final[set[str]] = {"album", "single", "appears_on", "compilation"}
 MAX_ALBUMS_PER_REQUEST: Final[int] = 20
 MAX_ARTISTS_PER_REQUEST: Final[int] = 50
 MAX_TRACKS_PER_REQUEST: Final[int] = 50
@@ -223,3 +223,10 @@ SPOTIFY_ENV_PATH: Final[Path] = _temp_path
 
 SP_TRACK: Final[str] = "https://api.spotify.com/v1/tracks/{track_id}"
 BASE_TRACK_URL: Final[str] = "https://open.spotify.com/track/{track_id}"
+
+
+class ArtistIncludeGroups(StrEnum):
+    ALBUM = "album"
+    SINGLE = "single"
+    APPEARS_ON = "appears_on"
+    COMPILATION = "compilation"

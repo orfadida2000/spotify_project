@@ -5,6 +5,7 @@ from sp2genius.utils.path import is_file
 from sp2genius.utils.typing import ReturnCode
 
 DEBUG_MODE: Final[bool] = False
+SIMULATE_MODE: Final[bool] = False
 
 _temp_path = Path(__file__)
 _exit_code, _temp_path, _err = is_file(_temp_path)

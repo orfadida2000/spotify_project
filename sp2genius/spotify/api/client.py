@@ -1,68 +1,44 @@
 import argparse
 
-import requests
-
-from . import CID, CSEC
+from .constants import SPOTIFY_TRACK_URL_RE
 from .extractors import extract_track_info
 from .requests import (
-    build_album_api_request,
-    build_artists_api_request,
-    build_track_api_request,
-    track_url_to_tid,
+    get_album,
+    get_artists,
+    get_track,
 )
-from .tokens import _get_token
 
 
-def add_request_headers(req: dict, token: str) -> None:
-    """Add Authorization header to a Spotify API request dictionary."""
-    headers = req.get("headers", {})
-    headers["Authorization"] = f"Bearer {token}"
-    req["headers"] = headers
-
-
-def make_request(req: dict, client_id: str, client_secret: str) -> dict:
-    if not client_id or not client_secret:
-        raise ValueError("Client ID and Client Secret must be provided")
-    try:
-        token = _get_token(client_id, client_secret)
-    except Exception as e:
-        raise ValueError(f"Spotify API authentication error: {e}") from None
-    add_request_headers(req, token)
-    resp = requests.get(**req)
-    resp.raise_for_status()
-    data = resp.json()
-    return data
+def track_url_to_tid(track_url: str) -> str:
+    if not isinstance(track_url, str):
+        raise TypeError("track_url must be a string")
+    m = SPOTIFY_TRACK_URL_RE.fullmatch(track_url)
+    if not m:
+        raise ValueError("Invalid Spotify track URL format")
+    return m.group(1)
 
 
 def get_track_info(
     track_id: str,
-    client_id: str = CID,
-    client_secret: str = CSEC,
+    market: str | None = None,
     full_info: bool = False,
 ) -> dict:
-    req = build_track_api_request(track_id)
-    data = make_request(req, client_id, client_secret)
+    data = get_track(track_id, market)
     if full_info:
         album_id = data["album"]["id"]
-        album_req = build_album_api_request(album_id)
-        album = make_request(album_req, client_id, client_secret)
+        album = get_album(album_id, market)
         data["album"] = album
 
         artist_ids = [a["id"] for a in data["artists"]]
-        artists_req = build_artists_api_request(artist_ids)
-        artists = make_request(artists_req, client_id, client_secret)["artists"]
+        artists = get_artists(artist_ids)["artists"]
         data["artists"] = artists
     track_info = extract_track_info(data)
     return track_info
 
 
-def resolve_title_artists_from_spotify_url(
-    url: str,
-    client_id: str = CID,
-    client_secret: str = CSEC,
-) -> tuple[str, list[str]]:
+def resolve_title_artists_from_spotify_url(url: str) -> tuple[str, list[str]]:
     tid = track_url_to_tid(url)
-    track_info = get_track_info(tid, client_id, client_secret, full_info=True)
+    track_info = get_track_info(tid, full_info=True)
     title = track_info["title"]
     artist_lst = [track_info["primary_artist"]["name"]] + [
         artist["name"] for artist in track_info["featured_artists"]
@@ -96,9 +72,17 @@ def parse_args() -> argparse.Namespace:
 def main():
     try:
         args = parse_args()
-        title, artist = resolve_title_artists_from_spotify_url(args.url)
-        print(f"Title: {title}")
-        print(f"Artist list: {artist}")
+        tid = track_url_to_tid(track_url=args.url)
+        basic_track_info = get_track_info(track_id=tid, full_info=False)
+        full_track_info = get_track_info(track_id=tid, full_info=True)
+        import json
+
+        with open("basic_track_info.json", "w") as f:
+            json.dump(basic_track_info, f, indent=2)
+        with open("full_track_info.json", "w") as f:
+            json.dump(full_track_info, f, indent=2)
+        print("Basic track info saved to 'basic_track_info.json'")
+        print("Full track info saved to 'full_track_info.json'")
     except SystemExit:
         pass  # argparse already printed error message
 

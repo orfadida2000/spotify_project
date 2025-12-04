@@ -50,19 +50,6 @@ class BaseEntity:
         cls.__slots__ = cls.FIELDS  # or tuple(cls.FIELDS)
 
     @classmethod
-    def _get_dummy_data(cls) -> dict:
-        dummy_data = dict.fromkeys(cls.REQUIRED_FIELDS, "")
-        return dummy_data
-
-    @classmethod
-    def get_partial_instance(cls, data: dict) -> "BaseEntity":
-        dummy_data = cls._get_dummy_data()
-        for field in cls.FIELDS:
-            if field in data:
-                dummy_data[field] = data[field]
-        return cls(dummy_data)
-
-    @classmethod
     def _validate_insert_data(cls, data: dict) -> None:
         required = set(cls.REQUIRED_FIELDS)
         provided = set(data.keys())
@@ -235,12 +222,12 @@ class Album(BaseEntity):
     def register_image(
         self,
         cur: sqlite3.Cursor,
-        incomplete_image: AlbumImage,
+        image: AlbumImage,
         simulate: bool = False,
     ) -> None:
         data = self.curr_state_dict()
-        image = incomplete_image
-        image.album_id = data["album_id"]  # type: ignore
+        if data.album_id != image.album_id:  # type: ignore
+            raise ValueError("An image attached to an album must reference its album_id")
         image.upsert_to_db(cur=cur, simulate=simulate)
 
 
@@ -284,13 +271,13 @@ class Artist(BaseEntity):
     def register_discography_entry(
         self,
         cur: sqlite3.Cursor,
-        incomplete_song: Song,
+        song: Song,
         simulate: bool = False,
     ) -> None:
         data = self.curr_state_dict()
         entry = DiscographyEntry(
             data={
-                "track_id": incomplete_song.track_id,  # type: ignore
+                "track_id": song.track_id,  # type: ignore
                 "artist_id": data["artist_id"],
             }
         )
@@ -299,10 +286,10 @@ class Artist(BaseEntity):
     def register_image(
         self,
         cur: sqlite3.Cursor,
-        incomplete_image: ArtistImage,
+        image: ArtistImage,
         simulate: bool = False,
     ) -> None:
         data = self.curr_state_dict()
-        image = incomplete_image
-        image.artist_id = data["artist_id"]  # type: ignore
+        if data.artist_id != image.artist_id:  # type: ignore
+            raise ValueError("An image attached to an artist must reference its artist_id")
         image.upsert_to_db(cur=cur, simulate=simulate)

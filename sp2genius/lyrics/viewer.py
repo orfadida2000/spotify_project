@@ -1,10 +1,6 @@
-import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-from lyricsgenius import Genius
-
-from sp2genius.genius.constants import GENIUS_ENV_PATH, GENIUS_TOKEN_ENV_VAR
+from sp2genius.genius.api.client import genius_url_for_title_artists
 from sp2genius.spotify.api.client import resolve_title_artists_from_spotify_url
 
 from .argparse import (
@@ -16,41 +12,6 @@ from .argparse import (
     spotify_track_uri_to_url,
 )
 from .db import get_value_from_db, set_value_in_db
-
-load_dotenv(dotenv_path=GENIUS_ENV_PATH)
-GENIUS_API_TOKEN = os.getenv(key=GENIUS_TOKEN_ENV_VAR)
-
-
-def genius_url_for_title_artists(
-    title: str,
-    artist_lst: list[str],
-    verbose: bool = False,
-) -> str:
-    try:
-        token = GENIUS_API_TOKEN
-        if not token or not title:
-            raise ValueError("Missing Genius API token or empty title.")
-        g = Genius(
-            access_token=token,
-            timeout=10,
-            skip_non_songs=True,
-            remove_section_headers=False,
-            verbose=verbose,
-        )
-        if len(artist_lst) == 0:
-            song = g.search_song(title=title, get_full_info=False)
-            url = getattr(song, "url", None) if song else None
-            if not url:
-                raise ValueError("404 could not find song URL on Genius.")
-            return url
-        for artist in artist_lst:
-            song = g.search_song(title=title, artist=artist, get_full_info=False)
-            url = getattr(song, "url", None) if song else None
-            if url:
-                return url
-        raise ValueError("404 could not find song URL on Genius.")
-    except Exception as e:
-        raise ValueError(f"Genius API error: {e}") from None
 
 
 def process_url_mode(spotify_url: str) -> str:

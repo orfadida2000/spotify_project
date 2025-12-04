@@ -52,7 +52,12 @@ ipython_config.py
 
 # -------------------------------------
 # Project specific ignores
-tests/
+**/tests/
+**/tests_data/
+**/tests_output/
+**/test_outputs/
 **/.spotify_token_cache.json
 **/*.env
+**/test.py
+**/tests.py
 
