@@ -148,7 +148,6 @@ def process_dir_for_spotify(
                             url = genius_url_for_title_artists(
                                 title=norm_title,
                                 artist_lst=norm_artist_lst,
-                                verbose=verbose,
                             )
                             if url:
                                 outcome = SearchOutcome.FOUND

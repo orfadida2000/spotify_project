@@ -1,6 +1,7 @@
 from typing import Any
 
 import requests
+from lyricsgenius import Genius
 
 from . import GENIUS_API_TOKEN
 from .constants import (
@@ -35,10 +36,10 @@ def _get(
     r.raise_for_status()
     data = r.json()
 
-    return data
+    return data["response"]
 
 
-# ---------- basic fetch by ID ----------
+# ---------- basic fetch by ID from the native Genius API ----------
 
 
 def get_song(song_id: int | str) -> dict[str, Any]:
@@ -112,3 +113,41 @@ def get_album_tracks(
     path = f"/albums/{album_id}/tracks"
     params = {"per_page": per_page, "page": page_num}
     return _get(path, params)
+
+
+# ---------- complex fetch by title, artist from lyricsgenius API ----------
+
+
+def get_song_by_title_artist(title: str, artist_lst: list[str]) -> dict[str, Any]:
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("Title must be a non-empty string.")
+    if not isinstance(artist_lst, list):
+        raise ValueError("Artist must be a list of strings.")
+
+    # Clean title and artist list
+    title = title.strip()
+    artist_lst = [
+        artist.strip() for artist in artist_lst if isinstance(artist, str) and artist.strip()
+    ]
+
+    song = None
+    if not GENIUS_API_TOKEN or not title:
+        raise ValueError("Missing Genius API token or empty title.")
+    g = Genius(
+        access_token=GENIUS_API_TOKEN,
+        timeout=TIMEOUT,
+        skip_non_songs=True,
+        remove_section_headers=False,
+        response_format=DEFAULT_TEXT_FORMAT,
+    )
+    if len(artist_lst) == 0:
+        song = g.search_song(title=title, get_full_info=True)
+    else:
+        for artist in artist_lst:
+            song = g.search_song(title=title, artist=artist, get_full_info=True)
+            if song:
+                break
+    if not song:
+        raise ValueError("404 could not find song URL on Genius.")
+    data = song.to_dict()  # type: ignore
+    return data

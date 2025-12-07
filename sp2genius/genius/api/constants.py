@@ -1,7 +1,10 @@
 # Genius related constants
+import re
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Final
+
+from lyricsgenius.genius import ResponseFormatT
 
 from sp2genius.constants.paths import ENV_DIR_PATH
 from sp2genius.utils.path import is_file
@@ -24,6 +27,11 @@ MEDIA_SPECS: Final[dict[str, Any]] = {  # Only youTube are relevant for now
     "type": str,
     "url": str,
 }
+REQUIRED_MEDIA_FIELDS: Final[set[str]] = {
+    "provider",
+    "type",
+    "url",
+}
 
 ARTIST_SPECS: Final[dict[str, Any]] = {
     "header_image_url": str,
@@ -31,6 +39,11 @@ ARTIST_SPECS: Final[dict[str, Any]] = {
     "image_url": str,
     "name": str,
     "url": str,
+}
+REQUIRED_ARTIST_FIELDS: Final[set[str]] = {
+    "id",
+    "name",
+    "url",
 }
 
 ALBUM_SPECS: Final[dict[str, Any]] = {
@@ -40,6 +53,13 @@ ALBUM_SPECS: Final[dict[str, Any]] = {
     "release_date_for_display": str,
     "url": str,
     "artist": ARTIST_SPECS,
+}
+REQUIRED_ALBUM_FIELDS: Final[set[str]] = {
+    "id",
+    "name",
+    "release_date_for_display",
+    "url",
+    "artist",
 }
 
 SONG_SPECS: Final[dict[str, Any]] = {
@@ -59,6 +79,14 @@ SONG_SPECS: Final[dict[str, Any]] = {
     "album": ALBUM_SPECS,
     "media": [MEDIA_SPECS],
 }
+REQUIRED_SONG_FIELDS: Final[set[str]] = {
+    "id",
+    "release_date_for_display",
+    "title",
+    "url",
+    "primary_artist",
+    "album",
+}
 
 
 class ArtistSongsSort(StrEnum):
@@ -67,6 +95,11 @@ class ArtistSongsSort(StrEnum):
     RELEASE_DATE = "release_date"
 
 
-DEFAULT_TEXT_FORMAT: Final[str] = "plain"
+DEFAULT_TEXT_FORMAT: Final[ResponseFormatT] = "plain"
 MAX_PER_PAGE: Final[int] = 50
 TIMEOUT: Final[int] = 10  # seconds
+
+YOUTUBE_VIDEO_ID_RE: Final[re.Pattern[str]] = re.compile(pattern=r"[A-Za-z0-9_-]{11}")
+YOUTUBE_VIDEO_URL_RE: Final[re.Pattern[str]] = re.compile(
+    pattern=rf"^https://www.youtube.com/watch\?v=({YOUTUBE_VIDEO_ID_RE.pattern})$"
+)

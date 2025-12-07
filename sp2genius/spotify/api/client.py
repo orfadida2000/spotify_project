@@ -1,7 +1,7 @@
 import argparse
 
 from .constants import SPOTIFY_TRACK_URL_RE
-from .extractors import extract_track_info
+from .normalization import normalize_track_info
 from .requests import (
     get_album,
     get_artists,
@@ -32,7 +32,7 @@ def get_track_info(
         artist_ids = [a["id"] for a in data["artists"]]
         artists = get_artists(artist_ids)["artists"]
         data["artists"] = artists
-    track_info = extract_track_info(data)
+    track_info = normalize_track_info(data)
     return track_info
 
 

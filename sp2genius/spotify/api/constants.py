@@ -10,7 +10,7 @@ from sp2genius.utils.typing import ReturnCode
 
 SPOTIFY_ID_RE: Final[re.Pattern[str]] = re.compile(pattern=r"[A-Za-z0-9]{22}")
 SPOTIFY_TRACK_URL_RE: Final[re.Pattern[str]] = re.compile(
-    f"^https://open.spotify.com/track/({SPOTIFY_ID_RE.pattern})$"
+    pattern=f"^https://open.spotify.com/track/({SPOTIFY_ID_RE.pattern})$"
 )
 BASE_API_URL: Final[str] = "https://api.spotify.com/v1"
 MAX_ALBUMS_PER_REQUEST: Final[int] = 20

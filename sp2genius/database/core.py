@@ -1,20 +1,26 @@
 import sqlite3
 from textwrap import dedent
 
-from .schema import (
-    ALBUM_IMAGES_TABLE_COL_META,
-    ALBUM_IMAGES_TABLE_PRIMARY_KEYS,
-    ALBUMS_TABLE_COL_META,
-    ALBUMS_TABLE_PRIMARY_KEYS,
-    ARTIST_IMAGES_TABLE_COL_META,
-    ARTIST_IMAGES_TABLE_PRIMARY_KEYS,
-    ARTISTS_TABLE_COL_META,
-    ARTISTS_TABLE_PRIMARY_KEYS,
-    DISCOGRAPHY_TABLE_COL_META,
-    DISCOGRAPHY_TABLE_PRIMARY_KEYS,
-    SONGS_TABLE_COL_META,
-    SONGS_TABLE_PRIMARY_KEYS,
-)
+CONCAT = "||"  # SQLite string concatenation operator
+FOREIGN_KEYS = True
+_YEAR_GLOB = r"[0-9][0-9][0-9][0-9]"
+_MONTH_GLOB = r"[0-9][0-9]"
+_DAY_GLOB = r"[0-9][0-9]"
+
+_ISO_YEAR_GLOB = f"{_YEAR_GLOB}"
+CHECK_ISO_YEAR_GLOB = lambda col: f"length({col}) = 4 AND {col} GLOB '{_ISO_YEAR_GLOB}'"
+
+_ISO_YEAR_MONTH_GLOB = f"{_YEAR_GLOB}-{_MONTH_GLOB}"
+CHECK_ISO_YEAR_MONTH_GLOB = lambda col: f"length({col}) = 7 AND {col} GLOB '{_ISO_YEAR_MONTH_GLOB}'"
+
+_ISO_FULL_DATE_GLOB = f"{_YEAR_GLOB}-{_MONTH_GLOB}-{_DAY_GLOB}"
+CHECK_ISO_FULL_DATE_GLOB = lambda col: f"length({col}) = 10 AND {col} GLOB '{_ISO_FULL_DATE_GLOB}'"
+
+_ALPHANUMERIC_GLOB = r"[A-Za-z0-9]"
+CHECK_ALPHANUMERIC_GLOB = lambda col: f"{col} GLOB '{_ALPHANUMERIC_GLOB}*'"
+
+_BASE64_URL_SAFE_GLOB = r"[A-Za-z0-9_-]"
+CHECK_BASE64_URL_SAFE_GLOB = lambda col: f"{col} GLOB '{_BASE64_URL_SAFE_GLOB}*'"
 
 
 class BaseEntity:
@@ -200,96 +206,3 @@ class BaseEntity:
         else:
             self._simulate_sql_exc(sql, data)
             return False
-
-
-class ArtistImage(BaseEntity):
-    FIELD_META = ARTIST_IMAGES_TABLE_COL_META.copy()
-    PRIMARY_KEYS = ARTIST_IMAGES_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "artist_images"
-
-
-class AlbumImage(BaseEntity):
-    FIELD_META = ALBUM_IMAGES_TABLE_COL_META.copy()
-    PRIMARY_KEYS = ALBUM_IMAGES_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "album_images"
-
-
-class Album(BaseEntity):
-    FIELD_META = ALBUMS_TABLE_COL_META.copy()
-    PRIMARY_KEYS = ALBUMS_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "albums"
-
-    def register_image(
-        self,
-        cur: sqlite3.Cursor,
-        image: AlbumImage,
-        simulate: bool = False,
-    ) -> None:
-        data = self.curr_state_dict()
-        if data.album_id != image.album_id:  # type: ignore
-            raise ValueError("An image attached to an album must reference its album_id")
-        image.upsert_to_db(cur=cur, simulate=simulate)
-
-
-class Song(BaseEntity):
-    FIELD_META = SONGS_TABLE_COL_META.copy()
-    PRIMARY_KEYS = SONGS_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "songs"
-
-
-class DiscographyEntry(BaseEntity):
-    FIELD_META = DISCOGRAPHY_TABLE_COL_META.copy()
-    PRIMARY_KEYS = DISCOGRAPHY_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "discography"
-
-    def insert_to_db(
-        self,
-        cur: sqlite3.Cursor,
-        simulate: bool = False,
-        on_conflict: bool = False,
-    ) -> None:
-        super().insert_to_db(cur=cur, simulate=simulate, on_conflict=True)
-
-    def update_fields_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> bool:
-        raise NotImplementedError(
-            "DiscographyEntry.update_fields_db is not implemented."
-            "Use insert_to_db instead, as discography entries are immutable."
-        )
-
-    def upsert_to_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> None:
-        raise NotImplementedError(
-            "DiscographyEntry.upsert_to_db is not implemented."
-            "Use insert_to_db instead, as discography entries are immutable."
-        )
-
-
-class Artist(BaseEntity):
-    FIELD_META = ARTISTS_TABLE_COL_META.copy()
-    PRIMARY_KEYS = ARTISTS_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "artists"
-
-    def register_discography_entry(
-        self,
-        cur: sqlite3.Cursor,
-        song: Song,
-        simulate: bool = False,
-    ) -> None:
-        data = self.curr_state_dict()
-        entry = DiscographyEntry(
-            data={
-                "track_id": song.track_id,  # type: ignore
-                "artist_id": data["artist_id"],
-            }
-        )
-        entry.insert_to_db(cur=cur, simulate=simulate)
-
-    def register_image(
-        self,
-        cur: sqlite3.Cursor,
-        image: ArtistImage,
-        simulate: bool = False,
-    ) -> None:
-        data = self.curr_state_dict()
-        if data.artist_id != image.artist_id:  # type: ignore
-            raise ValueError("An image attached to an artist must reference its artist_id")
-        image.upsert_to_db(cur=cur, simulate=simulate)

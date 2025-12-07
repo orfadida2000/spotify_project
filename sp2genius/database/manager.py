@@ -1,10 +1,8 @@
 import sqlite3
 
-from .entities import Album, AlbumImage, Artist, ArtistImage, Song
-from .schema import (
-    FOREIGN_KEYS,
-    FULL_SCHEMA,
-)
+from .core import FOREIGN_KEYS
+from .schema import FULL_SCHEMA
+from .spotify.entities import Album, AlbumImage, Artist, ArtistImage, Song
 
 
 def initialize_db(db_path: str) -> None:
