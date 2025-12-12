@@ -1,5 +1,6 @@
 import sqlite3
 from textwrap import dedent
+from typing import Final, TypeAlias
 
 CONCAT = "||"  # SQLite string concatenation operator
 FOREIGN_KEYS = True
@@ -23,8 +24,20 @@ _BASE64_URL_SAFE_GLOB = r"[A-Za-z0-9_-]"
 CHECK_BASE64_URL_SAFE_GLOB = lambda col: f"{col} GLOB '{_BASE64_URL_SAFE_GLOB}*'"
 
 
+class _UnsetType:
+    __slots__ = ()
+
+    def __repr__(self) -> str:
+        return "UNSET"
+
+
+UNSET: Final[_UnsetType] = _UnsetType()
+
+BasicFieldValue: TypeAlias = None | _UnsetType
+
+
 class BaseEntity:
-    FIELD_META: dict[str, object] = {}  # to be overridden in subclasses
+    FIELD_META: dict[str, tuple[bool, type]] = {}  # to be overridden in subclasses
     PRIMARY_KEYS: tuple[str, ...] = ()  # to be overridden in subclasses
     TABLE_NAME: str = ""  # to be overridden in subclasses
 
@@ -32,18 +45,41 @@ class BaseEntity:
         super().__init_subclass__(**kwargs)
 
         # All subclasses must define FIELD_META
+        if not isinstance(cls.FIELD_META, dict):
+            raise TypeError(f"{cls.__name__}.FIELD_META must be a dict")
+        if not all(
+            isinstance(k, str)
+            and isinstance(v, tuple)
+            and len(v) == 2
+            and isinstance(v[0], bool)
+            and isinstance(v[1], type)
+            and v[1] is not type(None)
+            for k, v in cls.FIELD_META.items()
+        ):
+            raise TypeError(f"{cls.__name__}.FIELD_META must be a dict[str, tuple[bool, type]]")
         if not cls.FIELD_META:
-            raise TypeError(f"{cls.__name__} must define FIELD_META")
+            raise TypeError(f"{cls.__name__} must define a non-empty FIELD_META")
+
+        if not isinstance(cls.PRIMARY_KEYS, tuple):
+            raise TypeError(f"{cls.__name__}.PRIMARY_KEYS must be a tuple")
+        if not all(isinstance(pk, str) for pk in cls.PRIMARY_KEYS):
+            raise TypeError(f"{cls.__name__}.PRIMARY_KEYS must be a tuple of strings")
         if not cls.PRIMARY_KEYS:
-            raise TypeError(f"{cls.__name__} must define PRIMARY_KEYS")
+            raise TypeError(f"{cls.__name__} must define a non-empty PRIMARY_KEYS")
+
+        if not isinstance(cls.TABLE_NAME, str):
+            raise TypeError(f"{cls.__name__}.TABLE_NAME must be a string")
+        cls.TABLE_NAME = cls.TABLE_NAME.strip()
         if not cls.TABLE_NAME:
-            raise TypeError(f"{cls.__name__} must define TABLE_NAME")
+            raise TypeError(f"{cls.__name__} must define a non-empty TABLE_NAME")
+
         for pk_col in cls.PRIMARY_KEYS:
             if pk_col not in cls.FIELD_META:
                 raise ValueError(
                     f"{cls.__name__}: PRIMARY_KEYS contains '{pk_col}' which is not in FIELD_META"
                 )
-            elif not cls.FIELD_META[pk_col]:
+            is_required = cls.FIELD_META[pk_col][0]
+            if not is_required:
                 raise ValueError(
                     f"{cls.__name__}: PRIMARY_KEYS contains '{pk_col}' "
                     "which is not marked as required in FIELD_META"
@@ -51,19 +87,31 @@ class BaseEntity:
 
         # Compute per-class static attributes from FIELD_META
         cls.FIELDS = tuple(cls.FIELD_META.keys())
-        cls.REQUIRED_FIELDS = tuple(f for f, required in cls.FIELD_META.items() if required)
-        cls.OPTIONAL_FIELDS = tuple(f for f, required in cls.FIELD_META.items() if not required)
+        cls.REQUIRED_FIELDS = tuple(
+            (f, f_type) for f, (required, f_type) in cls.FIELD_META.items() if required
+        )
+        cls.OPTIONAL_FIELDS = tuple(
+            (f, (f_type, type(None)))
+            for f, (required, f_type) in cls.FIELD_META.items()
+            if not required
+        )
         cls.__slots__ = cls.FIELDS  # or tuple(cls.FIELDS)
 
     @classmethod
     def _validate_insert_data(cls, data: dict) -> None:
-        required = set(cls.REQUIRED_FIELDS)
+        required = {field for field, _ in cls.REQUIRED_FIELDS}
         provided = set(data.keys())
         missing = required - provided
         if missing:
             raise ValueError(
                 f"{cls.__name__}.insert_to_db: missing required fields for INSERT: {missing}"
             )
+
+    @classmethod
+    def _filter_fields(cls, fields: dict) -> dict:
+        assert set(fields.keys()) == set(cls.FIELDS), "Mismatch between fields and init data keys"
+        filtered_fields = {k: v for k, v in fields.items() if v is not UNSET}
+        return filtered_fields
 
     @staticmethod
     def _simulate_sql_exc(sql: str, data: dict) -> None:
@@ -85,37 +133,59 @@ class BaseEntity:
         print()
 
     def __init__(self, data: dict):
-        for field in self.REQUIRED_FIELDS:
+        for field, field_type in self.REQUIRED_FIELDS:
             if field in data:
                 if data[field] is None:
                     raise ValueError(
                         f"{self.__class__.__name__}.__init__: required field '{field}' is None"
+                    )
+                elif not isinstance(data[field], field_type):
+                    raise TypeError(
+                        f"{self.__class__.__name__}.__init__: field '{field}' must be of type"
+                        f" {field_type.__name__}, got {type(data[field]).__name__} instead"
                     )
                 setattr(self, field, data[field])
             elif field in self.PRIMARY_KEYS:
                 raise ValueError(
                     f"{self.__class__.__name__}.__init__: required primary key field '{field}' is missing"
                 )
-        for field in self.OPTIONAL_FIELDS:
+        for field, field_type in self.OPTIONAL_FIELDS:
             if field in data:
+                if not isinstance(data[field], field_type):
+                    raise TypeError(
+                        f"{self.__class__.__name__}.__init__: field '{field}' must be None or of type"
+                        f" {field_type[0].__name__}, got {type(data[field]).__name__} instead"
+                    )
                 setattr(self, field, data[field])
 
     def curr_state_dict(self) -> dict:
         data = {}
-        for field in self.REQUIRED_FIELDS:
+        for field, field_type in self.REQUIRED_FIELDS:
             if hasattr(self, field):
-                if getattr(self, field) is None:
+                field_value = getattr(self, field)
+                if field_value is None:
                     raise ValueError(
                         f"{self.__class__.__name__}.state_dict: required field '{field}' is None"
                     )
-                data[field] = getattr(self, field)
+                elif not isinstance(field_value, field_type):
+                    raise TypeError(
+                        f"{self.__class__.__name__}.state_dict: field '{field}' must be of type"
+                        f" {field_type.__name__}, got {type(field_value).__name__} instead"
+                    )
+                data[field] = field_value
             elif field in self.PRIMARY_KEYS:
                 raise ValueError(
                     f"{self.__class__.__name__}.state_dict: required primary key field '{field}' is missing"
                 )
-        for field in self.OPTIONAL_FIELDS:
+        for field, field_type in self.OPTIONAL_FIELDS:
             if hasattr(self, field):
-                data[field] = getattr(self, field)
+                field_value = getattr(self, field)
+                if not isinstance(field_value, field_type):
+                    raise TypeError(
+                        f"{self.__class__.__name__}.state_dict: field '{field}' must be None or of type"
+                        f" {field_type[0].__name__}, got {type(field_value).__name__} instead"
+                    )
+                data[field] = field_value
         return data
 
     def insert_to_db(

@@ -4,7 +4,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Final
 
-from sp2genius.constants.paths import ENV_DIR_PATH
+from sp2genius.constants.path import ENV_DIR_PATH
 from sp2genius.utils.path import is_file
 from sp2genius.utils.typing import ReturnCode
 

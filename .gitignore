@@ -60,4 +60,5 @@ ipython_config.py
 **/*.env
 **/test.py
 **/tests.py
+**/lyrics_db
 

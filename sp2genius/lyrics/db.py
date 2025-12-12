@@ -1,8 +1,13 @@
-from sp2genius.constants.paths import DB_PATH
+from pathlib import Path
+from typing import Final
+
+from sp2genius.constants.path import ROOT_DIR_PATH
 from sp2genius.constants.text import DELIM
 from sp2genius.spotify.api.client import resolve_title_artists_from_spotify_url
 from sp2genius.utils.path import is_readable_file, is_writable_dir
 from sp2genius.utils.typing import ReturnCode
+
+DB_PATH: Final[Path] = ROOT_DIR_PATH / "lyrics_db"
 
 
 def load_db() -> tuple[bool, dict[str, str]]:

@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Final
 
-import sp2genius
-from sp2genius.utils.path import get_absolute_path, is_dir
+from sp2genius import TOP_PKG_ABS_PATH
+from sp2genius.utils.path import is_dir
 from sp2genius.utils.typing import ReturnCode
 
 from .core import IS_A_SHELL
@@ -25,15 +25,11 @@ if _exit_code != ReturnCode.SUCCESS or _temp_path is None:
     raise RuntimeError(f"Failed to determine environment directory path: {_err}")
 ENV_DIR_PATH: Final[Path] = _temp_path
 
-TOP_PKG_PATH: Final[Path] = sp2genius.ABS_TOP_PKG_PATH
-ROOT_DIR_PATH: Final[Path] = TOP_PKG_PATH.parent
+ROOT_DIR_PATH: Final[Path] = TOP_PKG_ABS_PATH.parent
 
-DB_PATH: Final[Path] = get_absolute_path(ROOT_DIR_PATH / "lyrics_db")
 
 __all__ = [
     "HOME_PATH",
     "ENV_DIR_PATH",
-    "TOP_PKG_PATH",
     "ROOT_DIR_PATH",
-    "DB_PATH",
 ]

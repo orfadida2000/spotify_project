@@ -12,7 +12,7 @@ def get_home_path() -> Path:
 def get_absolute_path(path: str | Path) -> Path | None:
     assert isinstance(path, (str, Path)), "The argument path must be a string or a Path object"
     path = path.strip() if isinstance(path, str) else path
-    if isinstance(path, str) and not path:
+    if not path:
         return None
     p = Path(path).expanduser().resolve(strict=False)
     return p

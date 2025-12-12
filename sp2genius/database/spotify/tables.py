@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS artists (
                         CHECK (popularity IS NULL OR (popularity >= 0 AND popularity <= 100)),
     spotify_url     TEXT GENERATED ALWAYS AS (
                         {spotify_id_to_url(column="artist_id", concat=CONCAT, entity="artist")}
-                    ) VIRTUAL
+                    ) VIRTUAL,
     
     FOREIGN KEY (genius_id)
         REFERENCES genius_artist_info(genius_id)
@@ -57,12 +57,12 @@ CREATE TABLE IF NOT EXISTS artists (
 """
 ARTISTS_TABLE_PRIMARY_KEYS = ("artist_id",)
 ARTISTS_TABLE_COL_META = {
-    "artist_id": True,
-    "name": True,
-    "genius_id": False,
-    "total_followers": False,
-    "genres": False,
-    "popularity": False,
+    "artist_id": (True, str),
+    "name": (True, str),
+    "genius_id": (False, int),
+    "total_followers": (False, int),
+    "genres": (False, str),
+    "popularity": (False, int),
 }
 
 # --- Date format constants -----------------------------------------------------
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS albums (
 
     FOREIGN KEY (genius_id)
         REFERENCES genius_album_info(genius_id)
-        ON DELETE SET NULL
+        ON DELETE SET NULL,
 
     FOREIGN KEY (primary_artist_id)
         REFERENCES artists(artist_id)
@@ -112,15 +112,15 @@ CREATE TABLE IF NOT EXISTS albums (
 """
 ALBUMS_TABLE_PRIMARY_KEYS = ("album_id",)
 ALBUMS_TABLE_COL_META = {
-    "album_id": True,
-    "title": True,
-    "genius_id": False,
-    "primary_artist_id": True,
-    "album_type": True,
-    "total_tracks": True,
-    "release_date": True,
-    "label": False,
-    "popularity": False,
+    "album_id": (True, str),
+    "title": (True, str),
+    "genius_id": (False, int),
+    "primary_artist_id": (True, str),
+    "album_type": (True, str),
+    "total_tracks": (True, int),
+    "release_date": (True, str),
+    "label": (False, str),
+    "popularity": (False, int),
 }
 
 SONGS_TABLE = f"""
@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS songs (
 
     FOREIGN KEY (genius_id)
         REFERENCES genius_song_info(genius_id)
-        ON DELETE SET NULL
+        ON DELETE SET NULL,
 
     FOREIGN KEY (primary_artist_id)
         REFERENCES artists (artist_id)
@@ -162,16 +162,16 @@ CREATE TABLE IF NOT EXISTS songs (
 """
 SONGS_TABLE_PRIMARY_KEYS = ("track_id",)
 SONGS_TABLE_COL_META = {
-    "track_id": True,
-    "title": True,
-    "genius_id": False,
-    "primary_artist_id": True,
-    "album_id": True,
-    "disc_number": True,
-    "track_number": True,
-    "duration_ms": True,
-    "explicit": True,
-    "popularity": True,
+    "track_id": (True, str),
+    "title": (True, str),
+    "genius_id": (False, int),
+    "primary_artist_id": (True, str),
+    "album_id": (True, str),
+    "disc_number": (True, int),
+    "track_number": (True, int),
+    "duration_ms": (True, int),
+    "explicit": (True, bool),
+    "popularity": (True, int),
 }
 
 DISCOGRAPHY_TABLE = """
@@ -192,8 +192,8 @@ CREATE TABLE IF NOT EXISTS discography (
 """
 DISCOGRAPHY_TABLE_PRIMARY_KEYS = ("artist_id", "track_id")
 DISCOGRAPHY_TABLE_COL_META = {
-    "artist_id": True,
-    "track_id": True,
+    "artist_id": (True, str),
+    "track_id": (True, str),
 }
 
 ARTIST_IMAGES_TABLE = """
@@ -218,10 +218,10 @@ CREATE TABLE IF NOT EXISTS artist_images (
 """
 ARTIST_IMAGES_TABLE_PRIMARY_KEYS = ("artist_id", "url")
 ARTIST_IMAGES_TABLE_COL_META = {
-    "artist_id": True,
-    "url": True,
-    "width": False,
-    "height": False,
+    "artist_id": (True, str),
+    "url": (True, str),
+    "width": (False, int),
+    "height": (False, int),
 }
 
 ALBUM_IMAGES_TABLE = """
@@ -246,10 +246,10 @@ CREATE TABLE IF NOT EXISTS album_images (
 """
 ALBUM_IMAGES_TABLE_PRIMARY_KEYS = ("album_id", "url")
 ALBUM_IMAGES_TABLE_COL_META = {
-    "album_id": True,
-    "url": True,
-    "width": False,
-    "height": False,
+    "album_id": (True, str),
+    "url": (True, str),
+    "width": (False, int),
+    "height": (False, int),
 }
 
 

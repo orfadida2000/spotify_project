@@ -19,10 +19,10 @@ CREATE TABLE IF NOT EXISTS genius_artist_info (
 """
 GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS = ("genius_id",)
 GENIUS_ARTIST_INFO_TABLE_COL_META = {
-    "genius_id": True,
-    "name": True,
-    "genius_url": True,
-    "image_url": False,
+    "genius_id": (True, int),
+    "name": (True, str),
+    "genius_url": (True, str),
+    "image_url": (False, str),
 }
 
 GENIUS_ALBUM_INFO_TABLE = f"""
@@ -46,12 +46,12 @@ CREATE TABLE IF NOT EXISTS genius_album_info (
 """
 GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS = ("genius_id",)
 GENIUS_ALBUM_INFO_TABLE_COL_META = {
-    "genius_id": True,
-    "title": True,
-    "genius_url": True,
-    "primary_artist_genius_id": True,
-    "release_date": True,
-    "image_url": False,
+    "genius_id": (True, int),
+    "title": (True, str),
+    "genius_url": (True, str),
+    "primary_artist_genius_id": (True, int),
+    "release_date": (True, str),
+    "image_url": (False, str),
 }
 
 GENIUS_SONG_INFO_TABLE = f"""
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS genius_song_info (
     genius_url               TEXT NOT NULL
                                  CHECK (genius_url <> ''),
     primary_artist_genius_id INTEGER NOT NULL,
-    primary_album_genius_id  INTEGER NOT NULL,
+    album_genius_id          INTEGER NOT NULL,
     release_date             TEXT NOT NULL
                                  CHECK ({CHECK_ISO_FULL_DATE_GLOB(col="release_date")}),
     image_url                TEXT
@@ -91,23 +91,23 @@ CREATE TABLE IF NOT EXISTS genius_song_info (
         REFERENCES genius_artist_info(genius_id)
         ON DELETE RESTRICT,
 
-    FOREIGN KEY (primary_album_genius_id)
+    FOREIGN KEY (album_genius_id)
         REFERENCES genius_album_info(genius_id)
         ON DELETE RESTRICT
 );
 """
 GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS = ("genius_id",)
 GENIUS_SONG_INFO_TABLE_COL_META = {
-    "genius_id": True,
-    "title": True,
-    "genius_url": True,
-    "primary_artist_genius_id": True,
-    "primary_album_genius_id": True,
-    "release_date": True,
-    "image_url": False,
-    "apple_music_id": False,
-    "youtube_video_id": False,
-    "language": False,
+    "genius_id": (True, int),
+    "title": (True, str),
+    "genius_url": (True, str),
+    "primary_artist_genius_id": (True, int),
+    "album_genius_id": (True, int),
+    "release_date": (True, str),
+    "image_url": (False, str),
+    "apple_music_id": (False, str),
+    "youtube_video_id": (False, str),
+    "language": (False, str),
 }
 
 GENIUS_DISCOGRAPHY_TABLE = """
@@ -128,8 +128,8 @@ CREATE TABLE IF NOT EXISTS genius_discography (
 """
 GENIUS_DISCOGRAPHY_TABLE_PRIMARY_KEYS = ("artist_genius_id", "song_genius_id")
 GENIUS_DISCOGRAPHY_TABLE_COL_META = {
-    "artist_genius_id": True,
-    "song_genius_id": True,
+    "artist_genius_id": (True, int),
+    "song_genius_id": (True, int),
 }
 
 
