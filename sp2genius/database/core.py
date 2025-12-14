@@ -2,6 +2,8 @@ import sqlite3
 from textwrap import dedent
 from typing import Final, TypeAlias
 
+from sp2genius.utils import err_msg
+
 CONCAT = "||"  # SQLite string concatenation operator
 FOREIGN_KEYS = True
 _YEAR_GLOB = r"[0-9][0-9][0-9][0-9]"
@@ -39,6 +41,7 @@ BasicFieldValue: TypeAlias = None | _UnsetType
 class BaseEntity:
     FIELD_META: dict[str, tuple[bool, type]] = {}  # to be overridden in subclasses
     PRIMARY_KEYS: tuple[str, ...] = ()  # to be overridden in subclasses
+    FOREIGN_KEYS: dict[str, str | tuple[str, ...]] = {}  # to be overridden in subclasses
     TABLE_NAME: str = ""  # to be overridden in subclasses
 
     def __init_subclass__(cls, **kwargs):  # noqa: ANN003
@@ -46,9 +49,10 @@ class BaseEntity:
 
         # All subclasses must define FIELD_META
         if not isinstance(cls.FIELD_META, dict):
-            raise TypeError(f"{cls.__name__}.FIELD_META must be a dict")
+            raise TypeError(err_msg("FIELD_META must be a dict"))
         if not all(
             isinstance(k, str)
+            and k.strip()
             and isinstance(v, tuple)
             and len(v) == 2
             and isinstance(v[0], bool)
@@ -56,33 +60,59 @@ class BaseEntity:
             and v[1] is not type(None)
             for k, v in cls.FIELD_META.items()
         ):
-            raise TypeError(f"{cls.__name__}.FIELD_META must be a dict[str, tuple[bool, type]]")
+            raise TypeError(err_msg("FIELD_META must be a dict[str, tuple[bool, type]]"))
         if not cls.FIELD_META:
-            raise TypeError(f"{cls.__name__} must define a non-empty FIELD_META")
+            raise TypeError(err_msg("FIELD_META must be a non-empty dict"))
+        cls.FIELD_META = cls.FIELD_META.copy()
 
         if not isinstance(cls.PRIMARY_KEYS, tuple):
-            raise TypeError(f"{cls.__name__}.PRIMARY_KEYS must be a tuple")
-        if not all(isinstance(pk, str) for pk in cls.PRIMARY_KEYS):
-            raise TypeError(f"{cls.__name__}.PRIMARY_KEYS must be a tuple of strings")
+            raise TypeError(err_msg("PRIMARY_KEYS must be a tuple"))
+        if not all(isinstance(pk, str) and pk.strip() for pk in cls.PRIMARY_KEYS):
+            raise TypeError(err_msg("PRIMARY_KEYS must be a tuple of non-empty strings"))
         if not cls.PRIMARY_KEYS:
-            raise TypeError(f"{cls.__name__} must define a non-empty PRIMARY_KEYS")
+            raise TypeError(err_msg("PRIMARY_KEYS must be a non-empty tuple"))
+
+        if not isinstance(cls.FOREIGN_KEYS, dict):
+            raise TypeError(err_msg("FOREIGN_KEYS must be a dict"))
+        if not all(
+            isinstance(k, str)
+            and k.strip()
+            and (
+                (isinstance(v, str) and v.strip())
+                or (
+                    isinstance(v, tuple)
+                    and len(v) > 0
+                    and all(isinstance(item, str) and item.strip() for item in v)
+                )
+            )
+            for k, v in cls.FOREIGN_KEYS.items()
+        ):
+            raise TypeError(err_msg("FOREIGN_KEYS must be a dict[str, str | tuple[str, ...]]"))
+        cls.FOREIGN_KEYS = cls.FOREIGN_KEYS.copy()
 
         if not isinstance(cls.TABLE_NAME, str):
-            raise TypeError(f"{cls.__name__}.TABLE_NAME must be a string")
-        cls.TABLE_NAME = cls.TABLE_NAME.strip()
-        if not cls.TABLE_NAME:
-            raise TypeError(f"{cls.__name__} must define a non-empty TABLE_NAME")
+            raise TypeError(err_msg("TABLE_NAME must be a string"))
+        if not cls.TABLE_NAME.strip():
+            raise TypeError(err_msg("TABLE_NAME must be a non-empty string"))
 
         for pk_col in cls.PRIMARY_KEYS:
             if pk_col not in cls.FIELD_META:
                 raise ValueError(
-                    f"{cls.__name__}: PRIMARY_KEYS contains '{pk_col}' which is not in FIELD_META"
+                    err_msg(f"PRIMARY_KEYS contains '{pk_col}' which is not in FIELD_META")
                 )
             is_required = cls.FIELD_META[pk_col][0]
             if not is_required:
                 raise ValueError(
-                    f"{cls.__name__}: PRIMARY_KEYS contains '{pk_col}' "
-                    "which is not marked as required in FIELD_META"
+                    err_msg(
+                        f"PRIMARY_KEYS contains '{pk_col}' which is not marked as required in FIELD_META "
+                        "which is not marked as required in FIELD_META"
+                    )
+                )
+
+        for fk_col in cls.FOREIGN_KEYS:
+            if fk_col not in cls.FIELD_META:
+                raise ValueError(
+                    err_msg(f"FOREIGN_KEYS contains '{fk_col}' which is not in FIELD_META")
                 )
 
         # Compute per-class static attributes from FIELD_META
@@ -98,18 +128,20 @@ class BaseEntity:
         cls.__slots__ = cls.FIELDS  # or tuple(cls.FIELDS)
 
     @classmethod
+    def get_fk_names_to_entity(cls, entity_cls: type["BaseEntity"]) -> str | tuple[str, ...] | None:
+        return cls.FOREIGN_KEYS.get(entity_cls.TABLE_NAME, None)
+
+    @classmethod
     def _validate_insert_data(cls, data: dict) -> None:
         required = {field for field, _ in cls.REQUIRED_FIELDS}
         provided = set(data.keys())
         missing = required - provided
         if missing:
-            raise ValueError(
-                f"{cls.__name__}.insert_to_db: missing required fields for INSERT: {missing}"
-            )
+            raise ValueError(err_msg(f"missing required fields for INSERT: {missing}"))
 
     @classmethod
     def _filter_fields(cls, fields: dict) -> dict:
-        assert set(fields.keys()) == set(cls.FIELDS), "Mismatch between fields and init data keys"
+        assert set(fields.keys()) <= set(cls.FIELDS), err_msg("Must only pass known fields")
         filtered_fields = {k: v for k, v in fields.items() if v is not UNSET}
         return filtered_fields
 
@@ -133,57 +165,57 @@ class BaseEntity:
         print()
 
     def __init__(self, data: dict):
+        data = self._filter_fields(data)
         for field, field_type in self.REQUIRED_FIELDS:
-            if field in data:
+            if field in data and data[field] is not UNSET:
                 if data[field] is None:
-                    raise ValueError(
-                        f"{self.__class__.__name__}.__init__: required field '{field}' is None"
-                    )
+                    raise ValueError(err_msg(f"required field '{field}' is None"))
                 elif not isinstance(data[field], field_type):
                     raise TypeError(
-                        f"{self.__class__.__name__}.__init__: field '{field}' must be of type"
-                        f" {field_type.__name__}, got {type(data[field]).__name__} instead"
+                        err_msg(
+                            f"field '{field}' must be of type {field_type.__name__}, got {type(data[field]).__name__} instead"
+                        )
                     )
                 setattr(self, field, data[field])
             elif field in self.PRIMARY_KEYS:
-                raise ValueError(
-                    f"{self.__class__.__name__}.__init__: required primary key field '{field}' is missing"
-                )
+                raise ValueError(err_msg(f"required primary key field '{field}' is missing"))
         for field, field_type in self.OPTIONAL_FIELDS:
-            if field in data:
+            if field in data and data[field] is not UNSET:
                 if not isinstance(data[field], field_type):
                     raise TypeError(
-                        f"{self.__class__.__name__}.__init__: field '{field}' must be None or of type"
-                        f" {field_type[0].__name__}, got {type(data[field]).__name__} instead"
+                        err_msg(
+                            f"field '{field}' must be None or of type "
+                            f"{(field_type[0] if field_type[0] is not None else field_type[1]).__name__}, got {type(data[field]).__name__} instead"
+                        )
                     )
                 setattr(self, field, data[field])
 
     def curr_state_dict(self) -> dict:
         data = {}
         for field, field_type in self.REQUIRED_FIELDS:
-            if hasattr(self, field):
+            if hasattr(self, field) and getattr(self, field) is not UNSET:
                 field_value = getattr(self, field)
                 if field_value is None:
-                    raise ValueError(
-                        f"{self.__class__.__name__}.state_dict: required field '{field}' is None"
-                    )
+                    raise ValueError(err_msg(f"required field '{field}' is None"))
                 elif not isinstance(field_value, field_type):
                     raise TypeError(
-                        f"{self.__class__.__name__}.state_dict: field '{field}' must be of type"
-                        f" {field_type.__name__}, got {type(field_value).__name__} instead"
+                        err_msg(
+                            f"field '{field}' must be of type {field_type.__name__}, got {type(field_value).__name__} instead"
+                        )
                     )
                 data[field] = field_value
             elif field in self.PRIMARY_KEYS:
-                raise ValueError(
-                    f"{self.__class__.__name__}.state_dict: required primary key field '{field}' is missing"
-                )
+                raise ValueError(err_msg(f"required primary key field '{field}' is missing"))
+
         for field, field_type in self.OPTIONAL_FIELDS:
-            if hasattr(self, field):
+            if hasattr(self, field) and getattr(self, field) is not UNSET:
                 field_value = getattr(self, field)
                 if not isinstance(field_value, field_type):
                     raise TypeError(
-                        f"{self.__class__.__name__}.state_dict: field '{field}' must be None or of type"
-                        f" {field_type[0].__name__}, got {type(field_value).__name__} instead"
+                        err_msg(
+                            f"field '{field}' must be None or of type "
+                            f"{(field_type[0] if field_type[0] is not None else field_type[1]).__name__}, got {type(field_value).__name__} instead"
+                        )
                     )
                 data[field] = field_value
         return data
@@ -195,7 +227,7 @@ class BaseEntity:
         on_conflict: bool = False,
     ) -> None:
         if not simulate and not cur:
-            raise ValueError(f"{self.__class__.__name__}.insert_to_db: 'cur' is required")
+            raise ValueError(err_msg("'cur' is required"))
 
         data = self.curr_state_dict()
         self._validate_insert_data(data)
@@ -222,7 +254,7 @@ class BaseEntity:
         simulate: bool = False,
     ) -> bool:
         if not simulate and not cur:
-            raise ValueError(f"{self.__class__.__name__}.update_fields_db: 'cur' is required")
+            raise ValueError(err_msg("'cur' is required"))
 
         data = self.curr_state_dict()
         update_cols = [k for k in data.keys() if k not in self.PRIMARY_KEYS]
@@ -247,7 +279,7 @@ class BaseEntity:
 
     def upsert_to_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> None:
         if not simulate and not cur:
-            raise ValueError(f"{self.__class__.__name__}.upsert_to_db: 'cur' is required")
+            raise ValueError(err_msg("'cur' is required"))
 
         # 1) Try UPDATE (patch existing row)
         row_updated = self.update_fields_db(cur=cur, simulate=simulate)
@@ -259,7 +291,7 @@ class BaseEntity:
 
     def exists_in_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> bool:
         if not simulate and not cur:
-            raise ValueError(f"{self.__class__.__name__}.exists_in_db: 'cur' is required")
+            raise ValueError(err_msg("'cur' is required"))
 
         data = self.curr_state_dict()
         where_clause = " AND\n    ".join(f"{pk_col} = :{pk_col}" for pk_col in self.PRIMARY_KEYS)

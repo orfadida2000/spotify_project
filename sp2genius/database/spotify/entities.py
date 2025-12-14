@@ -1,26 +1,41 @@
 import sqlite3
 
+from sp2genius.utils import err_msg
+
 from ..core import UNSET, BaseEntity, BasicFieldValue
 from .tables import (
     ALBUM_IMAGES_TABLE_COL_META,
+    ALBUM_IMAGES_TABLE_FOREIGN_KEYS,
+    ALBUM_IMAGES_TABLE_NAME,
     ALBUM_IMAGES_TABLE_PRIMARY_KEYS,
     ALBUMS_TABLE_COL_META,
+    ALBUMS_TABLE_FOREIGN_KEYS,
+    ALBUMS_TABLE_NAME,
     ALBUMS_TABLE_PRIMARY_KEYS,
     ARTIST_IMAGES_TABLE_COL_META,
+    ARTIST_IMAGES_TABLE_FOREIGN_KEYS,
+    ARTIST_IMAGES_TABLE_NAME,
     ARTIST_IMAGES_TABLE_PRIMARY_KEYS,
     ARTISTS_TABLE_COL_META,
+    ARTISTS_TABLE_FOREIGN_KEYS,
+    ARTISTS_TABLE_NAME,
     ARTISTS_TABLE_PRIMARY_KEYS,
     DISCOGRAPHY_TABLE_COL_META,
+    DISCOGRAPHY_TABLE_FOREIGN_KEYS,
+    DISCOGRAPHY_TABLE_NAME,
     DISCOGRAPHY_TABLE_PRIMARY_KEYS,
     SONGS_TABLE_COL_META,
+    SONGS_TABLE_FOREIGN_KEYS,
+    SONGS_TABLE_NAME,
     SONGS_TABLE_PRIMARY_KEYS,
 )
 
 
 class ArtistImage(BaseEntity):
-    FIELD_META = ARTIST_IMAGES_TABLE_COL_META.copy()
+    FIELD_META = ARTIST_IMAGES_TABLE_COL_META
     PRIMARY_KEYS = ARTIST_IMAGES_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "artist_images"
+    FOREIGN_KEYS = ARTIST_IMAGES_TABLE_FOREIGN_KEYS
+    TABLE_NAME = ARTIST_IMAGES_TABLE_NAME
 
     @classmethod
     def make_init_data(
@@ -39,11 +54,18 @@ class ArtistImage(BaseEntity):
         }
         return cls._filter_fields(fields)
 
+    def get_artist_id(self) -> str | BasicFieldValue:
+        return getattr(self, "artist_id", UNSET)
+
+    def get_url(self) -> str | BasicFieldValue:
+        return getattr(self, "url", UNSET)
+
 
 class AlbumImage(BaseEntity):
-    FIELD_META = ALBUM_IMAGES_TABLE_COL_META.copy()
+    FIELD_META = ALBUM_IMAGES_TABLE_COL_META
     PRIMARY_KEYS = ALBUM_IMAGES_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "album_images"
+    FOREIGN_KEYS = ALBUM_IMAGES_TABLE_FOREIGN_KEYS
+    TABLE_NAME = ALBUM_IMAGES_TABLE_NAME
 
     @classmethod
     def make_init_data(
@@ -62,11 +84,18 @@ class AlbumImage(BaseEntity):
         }
         return cls._filter_fields(fields)
 
+    def get_album_id(self) -> str | BasicFieldValue:
+        return getattr(self, "album_id", UNSET)
+
+    def get_url(self) -> str | BasicFieldValue:
+        return getattr(self, "url", UNSET)
+
 
 class Album(BaseEntity):
-    FIELD_META = ALBUMS_TABLE_COL_META.copy()
+    FIELD_META = ALBUMS_TABLE_COL_META
     PRIMARY_KEYS = ALBUMS_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "albums"
+    FOREIGN_KEYS = ALBUMS_TABLE_FOREIGN_KEYS
+    TABLE_NAME = ALBUMS_TABLE_NAME
 
     def register_image(
         self,
@@ -74,9 +103,8 @@ class Album(BaseEntity):
         image: AlbumImage,
         simulate: bool = False,
     ) -> None:
-        data = self.curr_state_dict()
-        if data.album_id != image.album_id:  # type: ignore
-            raise ValueError("An image attached to an album must reference its album_id")
+        if self.get_id() != image.get_album_id():
+            raise ValueError(err_msg("an image attached to an album must reference its album_id"))
         image.upsert_to_db(cur=cur, simulate=simulate)
 
     @classmethod
@@ -106,11 +134,21 @@ class Album(BaseEntity):
         }
         return cls._filter_fields(fields)
 
+    def get_id(self) -> str | BasicFieldValue:
+        return getattr(self, "album_id", UNSET)
+
+    def get_genius_id(self) -> int | BasicFieldValue:
+        return getattr(self, "genius_id", UNSET)
+
+    def get_primary_artist_id(self) -> str | BasicFieldValue:
+        return getattr(self, "primary_artist_id", UNSET)
+
 
 class Song(BaseEntity):
-    FIELD_META = SONGS_TABLE_COL_META.copy()
+    FIELD_META = SONGS_TABLE_COL_META
     PRIMARY_KEYS = SONGS_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "songs"
+    FOREIGN_KEYS = SONGS_TABLE_FOREIGN_KEYS
+    TABLE_NAME = SONGS_TABLE_NAME
 
     @classmethod
     def make_init_data(
@@ -141,11 +179,24 @@ class Song(BaseEntity):
         }
         return cls._filter_fields(fields)
 
+    def get_id(self) -> str | BasicFieldValue:
+        return getattr(self, "track_id", UNSET)
+
+    def get_genius_id(self) -> int | BasicFieldValue:
+        return getattr(self, "genius_id", UNSET)
+
+    def get_primary_artist_id(self) -> str | BasicFieldValue:
+        return getattr(self, "primary_artist_id", UNSET)
+
+    def get_album_id(self) -> str | BasicFieldValue:
+        return getattr(self, "album_id", UNSET)
+
 
 class DiscographyEntry(BaseEntity):
-    FIELD_META = DISCOGRAPHY_TABLE_COL_META.copy()
+    FIELD_META = DISCOGRAPHY_TABLE_COL_META
     PRIMARY_KEYS = DISCOGRAPHY_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "discography"
+    FOREIGN_KEYS = DISCOGRAPHY_TABLE_FOREIGN_KEYS
+    TABLE_NAME = DISCOGRAPHY_TABLE_NAME
 
     def insert_to_db(
         self,
@@ -157,21 +208,45 @@ class DiscographyEntry(BaseEntity):
 
     def update_fields_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> bool:
         raise NotImplementedError(
-            f"{self.__class__.__name__}.update_fields_db is not implemented."
-            "Use insert_to_db instead, as discography entries are immutable."
+            err_msg(
+                "this method is not implemented. "
+                "Use insert_to_db instead, as discography entries are immutable."
+            )
         )
 
     def upsert_to_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> None:
         raise NotImplementedError(
-            f"{self.__class__.__name__}.upsert_to_db is not implemented."
-            "Use insert_to_db instead, as discography entries are immutable."
+            err_msg(
+                "this method is not implemented. "
+                "Use insert_to_db instead, as discography entries are immutable."
+            )
         )
+
+    @classmethod
+    def make_init_data(
+        cls,
+        *,
+        artist_spotify_id: str | BasicFieldValue = UNSET,
+        track_spotify_id: str | BasicFieldValue = UNSET,
+    ) -> dict:
+        fields = {
+            "artist_id": artist_spotify_id,
+            "track_id": track_spotify_id,
+        }
+        return cls._filter_fields(fields)
+
+    def get_artist_id(self) -> str | BasicFieldValue:
+        return getattr(self, "artist_id", UNSET)
+
+    def get_song_id(self) -> str | BasicFieldValue:
+        return getattr(self, "track_id", UNSET)
 
 
 class Artist(BaseEntity):
-    FIELD_META = ARTISTS_TABLE_COL_META.copy()
+    FIELD_META = ARTISTS_TABLE_COL_META
     PRIMARY_KEYS = ARTISTS_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "artists"
+    FOREIGN_KEYS = ARTISTS_TABLE_FOREIGN_KEYS
+    TABLE_NAME = ARTISTS_TABLE_NAME
 
     def register_discography_entry(
         self,
@@ -179,12 +254,11 @@ class Artist(BaseEntity):
         song: Song,
         simulate: bool = False,
     ) -> None:
-        data = self.curr_state_dict()
         entry = DiscographyEntry(
-            data={
-                "artist_id": data["artist_id"],
-                "track_id": song.track_id,  # type: ignore
-            }
+            data=DiscographyEntry.make_init_data(
+                artist_spotify_id=self.get_id(),
+                track_spotify_id=song.get_id(),
+            )
         )
         entry.insert_to_db(cur=cur, simulate=simulate)
 
@@ -194,9 +268,8 @@ class Artist(BaseEntity):
         image: ArtistImage,
         simulate: bool = False,
     ) -> None:
-        data = self.curr_state_dict()
-        if data.artist_id != image.artist_id:  # type: ignore
-            raise ValueError("An image attached to an artist must reference its artist_id")
+        if self.get_id() != image.get_artist_id():
+            raise ValueError(err_msg("an image attached to an artist must reference its artist_id"))
         image.upsert_to_db(cur=cur, simulate=simulate)
 
     @classmethod
@@ -219,3 +292,9 @@ class Artist(BaseEntity):
             "popularity": popularity,
         }
         return cls._filter_fields(fields)
+
+    def get_id(self) -> str | BasicFieldValue:
+        return getattr(self, "artist_id", UNSET)
+
+    def get_genius_id(self) -> int | BasicFieldValue:
+        return getattr(self, "genius_id", UNSET)

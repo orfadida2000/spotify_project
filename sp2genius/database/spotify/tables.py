@@ -5,8 +5,17 @@ from ..core import (
     CHECK_ISO_YEAR_MONTH_GLOB,
     CONCAT,
 )
+from ..genius.tables import (
+    GENIUS_ALBUM_INFO_TABLE_NAME,
+    GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS,
+    GENIUS_ARTIST_INFO_TABLE_NAME,
+    GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS,
+    GENIUS_SONG_INFO_TABLE_NAME,
+    GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS,
+)
 
 
+# ---- UTILS ---- #
 def _spotify_track_id_to_url(column: str, concat: str) -> str:
     return f"'https://open.spotify.com/track/' {concat} {column}"
 
@@ -32,8 +41,12 @@ def spotify_id_to_url(column: str, concat: str, entity: str) -> str:
 
 CHECK_ID_GLOB = lambda id: f"length({id}) = 22 AND {CHECK_ALPHANUMERIC_GLOB(col=id)}"
 
+# ---- SPOTIFY TABLES + EXTENDED METADATA ---- #
+
+# Artists Table
+ARTISTS_TABLE_NAME = "artists"
 ARTISTS_TABLE = f"""
-CREATE TABLE IF NOT EXISTS artists (
+CREATE TABLE IF NOT EXISTS {ARTISTS_TABLE_NAME} (
     artist_id       TEXT PRIMARY KEY
                         CHECK ({CHECK_ID_GLOB(id="artist_id")}),
     name            TEXT NOT NULL
@@ -51,11 +64,14 @@ CREATE TABLE IF NOT EXISTS artists (
                     ) VIRTUAL,
     
     FOREIGN KEY (genius_id)
-        REFERENCES genius_artist_info(genius_id)
+        REFERENCES {GENIUS_ARTIST_INFO_TABLE_NAME}({GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS[0]})
         ON DELETE SET NULL
 );
 """
 ARTISTS_TABLE_PRIMARY_KEYS = ("artist_id",)
+ARTISTS_TABLE_FOREIGN_KEYS = {
+    GENIUS_ARTIST_INFO_TABLE_NAME: "genius_id",
+}
 ARTISTS_TABLE_COL_META = {
     "artist_id": (True, str),
     "name": (True, str),
@@ -65,10 +81,10 @@ ARTISTS_TABLE_COL_META = {
     "popularity": (False, int),
 }
 
-# --- Date format constants -----------------------------------------------------
-
+# Albums Table
+ALBUMS_TABLE_NAME = "albums"
 ALBUMS_TABLE = f"""
-CREATE TABLE IF NOT EXISTS albums (
+CREATE TABLE IF NOT EXISTS {ALBUMS_TABLE_NAME} (
     album_id               TEXT PRIMARY KEY
                                CHECK ({CHECK_ID_GLOB(id="album_id")}),
     title                  TEXT NOT NULL
@@ -102,15 +118,19 @@ CREATE TABLE IF NOT EXISTS albums (
                            ) VIRTUAL,
 
     FOREIGN KEY (genius_id)
-        REFERENCES genius_album_info(genius_id)
+        REFERENCES {GENIUS_ALBUM_INFO_TABLE_NAME}({GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS[0]})
         ON DELETE SET NULL,
 
     FOREIGN KEY (primary_artist_id)
-        REFERENCES artists(artist_id)
+        REFERENCES {ARTISTS_TABLE_NAME}({ARTISTS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT
 );
 """
 ALBUMS_TABLE_PRIMARY_KEYS = ("album_id",)
+ALBUMS_TABLE_FOREIGN_KEYS = {
+    GENIUS_ALBUM_INFO_TABLE_NAME: "genius_id",
+    ARTISTS_TABLE_NAME: "primary_artist_id",
+}
 ALBUMS_TABLE_COL_META = {
     "album_id": (True, str),
     "title": (True, str),
@@ -123,8 +143,10 @@ ALBUMS_TABLE_COL_META = {
     "popularity": (False, int),
 }
 
+# Songs Table
+SONGS_TABLE_NAME = "songs"
 SONGS_TABLE = f"""
-CREATE TABLE IF NOT EXISTS songs (
+CREATE TABLE IF NOT EXISTS {SONGS_TABLE_NAME} (
     track_id          TEXT PRIMARY KEY
                           CHECK ({CHECK_ID_GLOB(id="track_id")}),
     title             TEXT NOT NULL
@@ -148,19 +170,24 @@ CREATE TABLE IF NOT EXISTS songs (
                       ) VIRTUAL,
 
     FOREIGN KEY (genius_id)
-        REFERENCES genius_song_info(genius_id)
+        REFERENCES {GENIUS_SONG_INFO_TABLE_NAME}({GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS[0]})
         ON DELETE SET NULL,
 
     FOREIGN KEY (primary_artist_id)
-        REFERENCES artists (artist_id)
+        REFERENCES {ARTISTS_TABLE_NAME}({ARTISTS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT,
 
     FOREIGN KEY (album_id)
-        REFERENCES albums (album_id)
+        REFERENCES {ALBUMS_TABLE_NAME}({ALBUMS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT
 );
 """
 SONGS_TABLE_PRIMARY_KEYS = ("track_id",)
+SONGS_TABLE_FOREIGN_KEYS = {
+    GENIUS_SONG_INFO_TABLE_NAME: "genius_id",
+    ARTISTS_TABLE_NAME: "primary_artist_id",
+    ALBUMS_TABLE_NAME: "album_id",
+}
 SONGS_TABLE_COL_META = {
     "track_id": (True, str),
     "title": (True, str),
@@ -174,30 +201,38 @@ SONGS_TABLE_COL_META = {
     "popularity": (True, int),
 }
 
-DISCOGRAPHY_TABLE = """
-CREATE TABLE IF NOT EXISTS discography (
+# Discography Table
+DISCOGRAPHY_TABLE_NAME = "discography"
+DISCOGRAPHY_TABLE = f"""
+CREATE TABLE IF NOT EXISTS {DISCOGRAPHY_TABLE_NAME} (
     artist_id TEXT NOT NULL,
     track_id  TEXT NOT NULL,
 
     PRIMARY KEY (artist_id, track_id),
 
     FOREIGN KEY (artist_id)
-        REFERENCES artists (artist_id)
+        REFERENCES {ARTISTS_TABLE_NAME}({ARTISTS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT,
 
     FOREIGN KEY (track_id)
-        REFERENCES songs (track_id)
+        REFERENCES {SONGS_TABLE_NAME}({SONGS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
 );
 """
 DISCOGRAPHY_TABLE_PRIMARY_KEYS = ("artist_id", "track_id")
+DISCOGRAPHY_TABLE_FOREIGN_KEYS = {
+    ARTISTS_TABLE_NAME: "artist_id",
+    SONGS_TABLE_NAME: "track_id",
+}
 DISCOGRAPHY_TABLE_COL_META = {
     "artist_id": (True, str),
     "track_id": (True, str),
 }
 
-ARTIST_IMAGES_TABLE = """
-CREATE TABLE IF NOT EXISTS artist_images (
+# Artist Images Table
+ARTIST_IMAGES_TABLE_NAME = "artist_images"
+ARTIST_IMAGES_TABLE = f"""
+CREATE TABLE IF NOT EXISTS {ARTIST_IMAGES_TABLE_NAME} (
     artist_id TEXT NOT NULL,
     url       TEXT NOT NULL
                   CHECK (url <> ''),
@@ -212,11 +247,14 @@ CREATE TABLE IF NOT EXISTS artist_images (
     ),
 
     FOREIGN KEY (artist_id)
-        REFERENCES artists (artist_id)
+        REFERENCES {ARTISTS_TABLE_NAME}({ARTISTS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
 );
 """
 ARTIST_IMAGES_TABLE_PRIMARY_KEYS = ("artist_id", "url")
+ARTIST_IMAGES_TABLE_FOREIGN_KEYS = {
+    ARTISTS_TABLE_NAME: "artist_id",
+}
 ARTIST_IMAGES_TABLE_COL_META = {
     "artist_id": (True, str),
     "url": (True, str),
@@ -224,8 +262,10 @@ ARTIST_IMAGES_TABLE_COL_META = {
     "height": (False, int),
 }
 
-ALBUM_IMAGES_TABLE = """
-CREATE TABLE IF NOT EXISTS album_images (
+# Album Images Table
+ALBUM_IMAGES_TABLE_NAME = "album_images"
+ALBUM_IMAGES_TABLE = f"""
+CREATE TABLE IF NOT EXISTS {ALBUM_IMAGES_TABLE_NAME} (
     album_id  TEXT NOT NULL,
     url       TEXT NOT NULL
                   CHECK (url <> ''),
@@ -240,11 +280,14 @@ CREATE TABLE IF NOT EXISTS album_images (
     ),
 
     FOREIGN KEY (album_id)
-        REFERENCES albums (album_id)
+        REFERENCES {ALBUMS_TABLE_NAME}({ALBUMS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
 );
 """
 ALBUM_IMAGES_TABLE_PRIMARY_KEYS = ("album_id", "url")
+ALBUM_IMAGES_TABLE_FOREIGN_KEYS = {
+    ALBUMS_TABLE_NAME: "album_id",
+}
 ALBUM_IMAGES_TABLE_COL_META = {
     "album_id": (True, str),
     "url": (True, str),
@@ -252,7 +295,7 @@ ALBUM_IMAGES_TABLE_COL_META = {
     "height": (False, int),
 }
 
-
+# All Tables Creation Statements in Order of Dependencies
 TABLES = [
     ARTISTS_TABLE,
     ALBUMS_TABLE,

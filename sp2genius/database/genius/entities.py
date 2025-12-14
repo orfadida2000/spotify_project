@@ -1,22 +1,33 @@
 import sqlite3
 
+from sp2genius.utils import err_msg
+
 from ..core import UNSET, BaseEntity, BasicFieldValue
 from .tables import (
     GENIUS_ALBUM_INFO_TABLE_COL_META,
+    GENIUS_ALBUM_INFO_TABLE_FOREIGN_KEYS,
+    GENIUS_ALBUM_INFO_TABLE_NAME,
     GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS,
     GENIUS_ARTIST_INFO_TABLE_COL_META,
+    GENIUS_ARTIST_INFO_TABLE_FOREIGN_KEYS,
+    GENIUS_ARTIST_INFO_TABLE_NAME,
     GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS,
     GENIUS_DISCOGRAPHY_TABLE_COL_META,
+    GENIUS_DISCOGRAPHY_TABLE_FOREIGN_KEYS,
+    GENIUS_DISCOGRAPHY_TABLE_NAME,
     GENIUS_DISCOGRAPHY_TABLE_PRIMARY_KEYS,
     GENIUS_SONG_INFO_TABLE_COL_META,
+    GENIUS_SONG_INFO_TABLE_FOREIGN_KEYS,
+    GENIUS_SONG_INFO_TABLE_NAME,
     GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS,
 )
 
 
 class GeniusAlbumInfo(BaseEntity):
-    FIELD_META = GENIUS_ALBUM_INFO_TABLE_COL_META.copy()
+    FIELD_META = GENIUS_ALBUM_INFO_TABLE_COL_META
     PRIMARY_KEYS = GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "genius_album_info"
+    FOREIGN_KEYS = GENIUS_ALBUM_INFO_TABLE_FOREIGN_KEYS
+    TABLE_NAME = GENIUS_ALBUM_INFO_TABLE_NAME
 
     @classmethod
     def make_init_data(
@@ -39,11 +50,21 @@ class GeniusAlbumInfo(BaseEntity):
         }
         return cls._filter_fields(fields)
 
+    def get_id(self) -> int | BasicFieldValue:
+        return getattr(self, "genius_id", UNSET)
+
+    def get_genius_url(self) -> str | BasicFieldValue:
+        return getattr(self, "genius_url", UNSET)
+
+    def get_primary_artist_id(self) -> int | BasicFieldValue:
+        return getattr(self, "primary_artist_genius_id", UNSET)
+
 
 class GeniusSongInfo(BaseEntity):
-    FIELD_META = GENIUS_SONG_INFO_TABLE_COL_META.copy()
+    FIELD_META = GENIUS_SONG_INFO_TABLE_COL_META
     PRIMARY_KEYS = GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "genius_song_info"
+    FOREIGN_KEYS = GENIUS_SONG_INFO_TABLE_FOREIGN_KEYS
+    TABLE_NAME = GENIUS_SONG_INFO_TABLE_NAME
 
     @classmethod
     def make_init_data(
@@ -74,11 +95,24 @@ class GeniusSongInfo(BaseEntity):
         }
         return cls._filter_fields(fields)
 
+    def get_id(self) -> int | BasicFieldValue:
+        return getattr(self, "genius_id", UNSET)
+
+    def get_genius_url(self) -> str | BasicFieldValue:
+        return getattr(self, "genius_url", UNSET)
+
+    def get_primary_artist_id(self) -> int | BasicFieldValue:
+        return getattr(self, "primary_artist_genius_id", UNSET)
+
+    def get_album_id(self) -> int | BasicFieldValue:
+        return getattr(self, "album_genius_id", UNSET)
+
 
 class GeniusDiscographyEntry(BaseEntity):
-    FIELD_META = GENIUS_DISCOGRAPHY_TABLE_COL_META.copy()
+    FIELD_META = GENIUS_DISCOGRAPHY_TABLE_COL_META
     PRIMARY_KEYS = GENIUS_DISCOGRAPHY_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "genius_discography"
+    FOREIGN_KEYS = GENIUS_DISCOGRAPHY_TABLE_FOREIGN_KEYS
+    TABLE_NAME = GENIUS_DISCOGRAPHY_TABLE_NAME
 
     def insert_to_db(
         self,
@@ -90,21 +124,45 @@ class GeniusDiscographyEntry(BaseEntity):
 
     def update_fields_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> bool:
         raise NotImplementedError(
-            f"{self.__class__.__name__}.update_fields_db is not implemented."
-            "Use insert_to_db instead, as discography entries are immutable."
+            err_msg(
+                "this method is not implemented. "
+                "Use insert_to_db instead, as discography entries are immutable."
+            )
         )
 
     def upsert_to_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> None:
         raise NotImplementedError(
-            f"{self.__class__.__name__}.upsert_to_db is not implemented."
-            "Use insert_to_db instead, as discography entries are immutable."
+            err_msg(
+                "this method is not implemented. "
+                "Use insert_to_db instead, as discography entries are immutable."
+            )
         )
+
+    @classmethod
+    def make_init_data(
+        cls,
+        *,
+        artist_genius_id: int | BasicFieldValue = UNSET,
+        song_genius_id: int | BasicFieldValue = UNSET,
+    ) -> dict:
+        fields = {
+            "artist_genius_id": artist_genius_id,
+            "song_genius_id": song_genius_id,
+        }
+        return cls._filter_fields(fields)
+
+    def get_artist_id(self) -> int | BasicFieldValue:
+        return getattr(self, "artist_genius_id", UNSET)
+
+    def get_song_id(self) -> int | BasicFieldValue:
+        return getattr(self, "song_genius_id", UNSET)
 
 
 class GeniusArtistInfo(BaseEntity):
-    FIELD_META = GENIUS_ARTIST_INFO_TABLE_COL_META.copy()
+    FIELD_META = GENIUS_ARTIST_INFO_TABLE_COL_META
     PRIMARY_KEYS = GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS
-    TABLE_NAME = "genius_artist_info"
+    FOREIGN_KEYS = GENIUS_ARTIST_INFO_TABLE_FOREIGN_KEYS
+    TABLE_NAME = GENIUS_ARTIST_INFO_TABLE_NAME
 
     def register_discography_entry(
         self,
@@ -112,12 +170,11 @@ class GeniusArtistInfo(BaseEntity):
         song: GeniusSongInfo,
         simulate: bool = False,
     ) -> None:
-        data = self.curr_state_dict()
         entry = GeniusDiscographyEntry(
-            data={
-                "artist_genius_id": data["genius_id"],
-                "song_genius_id": song.genius_id,  # type: ignore
-            }
+            data=GeniusDiscographyEntry.make_init_data(
+                artist_genius_id=self.get_id(),
+                song_genius_id=song.get_id(),
+            )
         )
         entry.insert_to_db(cur=cur, simulate=simulate)
 
@@ -137,3 +194,9 @@ class GeniusArtistInfo(BaseEntity):
             "image_url": artist_image_url,
         }
         return cls._filter_fields(fields)
+
+    def get_id(self) -> int | BasicFieldValue:
+        return getattr(self, "genius_id", UNSET)
+
+    def get_genius_url(self) -> str | BasicFieldValue:
+        return getattr(self, "genius_url", UNSET)
