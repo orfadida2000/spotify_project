@@ -15,7 +15,7 @@ def _ensure_discography_entries(
 
 
 # --- Public API: insert_song --------------------------------------------------
-def insert_song(
+def insert_spotify_song(
     conn: sqlite3.Connection,
     *,
     song: Song,
@@ -87,9 +87,9 @@ def get_tracks_for_artist(
 
     cur.execute(
         f"""
-        SELECT {DiscographyEntry.get_fk_names_to_entity(Song)}
+        SELECT {DiscographyEntry.get_song_id_col_name()}
         FROM {DiscographyEntry.TABLE_NAME}
-        WHERE {DiscographyEntry.get_fk_names_to_entity(Artist)} = :aid
+        WHERE {DiscographyEntry.get_artist_id_col_name()} = :aid
         """,
         {"aid": artist.get_id()},
     )
@@ -132,27 +132,23 @@ def get_joint_songs_for_artists(
     track_list = list(joint_tracks)
     placeholders = ", ".join("?" for _ in track_list)
 
-    old_row_factory = conn.row_factory
-    try:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute(
-            f"""
-            SELECT *
-            FROM {Song.TABLE_NAME}
-            WHERE track_id IN ({placeholders})
-            """,
-            track_list,
-        )
-        songs = cur.fetchall()
-    finally:
-        conn.row_factory = old_row_factory
+    cur = conn.cursor()
+    cur.row_factory = sqlite3.Row  # type: ignore
+    cur.execute(
+        f"""
+        SELECT *
+        FROM {Song.TABLE_NAME}
+        WHERE {Song.get_id_col_name()} IN ({placeholders})
+        """,
+        track_list,
+    )
+    songs = cur.fetchall()
 
     # 3. Sort by main_artist_id, then album_id, then title
     songs.sort(
         key=lambda song: (
-            song["primary_artist_id"],
-            song["album_id"],
+            song[Song.get_primary_artist_id_col_name()],
+            song[Song.get_album_id_col_name()],
             song["disc_number"],
             song["track_number"],
         )

@@ -1,30 +1,66 @@
 import sqlite3
 
-from sp2genius.utils import err_msg
-
-from ..core import UNSET, BaseEntity, BasicFieldValue
+from ..core.base import BinaryAssociationEntity, SinglePkEntity
+from ..core.constants import UNSET
+from ..core.typing import BasicFieldValue
 from .tables import (
-    GENIUS_ALBUM_INFO_TABLE_COL_META,
     GENIUS_ALBUM_INFO_TABLE_FOREIGN_KEYS,
+    GENIUS_ALBUM_INFO_TABLE_META,
     GENIUS_ALBUM_INFO_TABLE_NAME,
     GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS,
-    GENIUS_ARTIST_INFO_TABLE_COL_META,
     GENIUS_ARTIST_INFO_TABLE_FOREIGN_KEYS,
+    GENIUS_ARTIST_INFO_TABLE_META,
     GENIUS_ARTIST_INFO_TABLE_NAME,
     GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS,
-    GENIUS_DISCOGRAPHY_TABLE_COL_META,
     GENIUS_DISCOGRAPHY_TABLE_FOREIGN_KEYS,
+    GENIUS_DISCOGRAPHY_TABLE_META,
     GENIUS_DISCOGRAPHY_TABLE_NAME,
     GENIUS_DISCOGRAPHY_TABLE_PRIMARY_KEYS,
-    GENIUS_SONG_INFO_TABLE_COL_META,
     GENIUS_SONG_INFO_TABLE_FOREIGN_KEYS,
+    GENIUS_SONG_INFO_TABLE_META,
     GENIUS_SONG_INFO_TABLE_NAME,
     GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS,
 )
 
 
-class GeniusAlbumInfo(BaseEntity):
-    FIELD_META = GENIUS_ALBUM_INFO_TABLE_COL_META
+class GeniusEntity(SinglePkEntity):
+    @classmethod
+    def get_id_col_name(cls) -> str:
+        return cls.get_pk_name()
+
+    def get_id(self) -> int:
+        return self.get_pk_value()
+
+    def set_id(self, new_id: int) -> None:
+        self.set_pk_value(new_id)
+
+    @classmethod
+    def get_genius_url_col_name(cls) -> str:
+        return "genius_url"
+
+    def get_genius_url(self) -> str:
+        genius_url_col_name = self.get_genius_url_col_name()
+        return self.get_field_value(genius_url_col_name)
+
+    def set_genius_url(self, new_url: str) -> None:
+        genius_url_col_name = self.get_genius_url_col_name()
+        self.set_field_value(genius_url_col_name, new_url)
+
+    @classmethod
+    def get_image_url_col_name(cls) -> str:
+        return "image_url"
+
+    def get_image_url(self) -> str | BasicFieldValue:
+        image_url_col_name = self.get_image_url_col_name()
+        return self.get_field_value(image_url_col_name)
+
+    def set_image_url(self, new_url: str | BasicFieldValue) -> None:
+        image_url_col_name = self.get_image_url_col_name()
+        self.set_field_value(image_url_col_name, new_url)
+
+
+class GeniusAlbumInfo(GeniusEntity):
+    TABLE_META = GENIUS_ALBUM_INFO_TABLE_META
     PRIMARY_KEYS = GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS
     FOREIGN_KEYS = GENIUS_ALBUM_INFO_TABLE_FOREIGN_KEYS
     TABLE_NAME = GENIUS_ALBUM_INFO_TABLE_NAME
@@ -41,27 +77,40 @@ class GeniusAlbumInfo(BaseEntity):
         album_image_url: str | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "genius_id": album_genius_id,
-            "title": album_title,
-            "genius_url": album_genius_url,
-            "primary_artist_genius_id": primary_artist_genius_id,
+            cls.get_id_col_name(): album_genius_id,
+            cls.get_title_col_name(): album_title,
+            cls.get_genius_url_col_name(): album_genius_url,
+            cls.get_primary_artist_id_col_name(): primary_artist_genius_id,
             "release_date": release_date,
-            "image_url": album_image_url,
+            cls.get_image_url_col_name(): album_image_url,
         }
-        return cls._filter_fields(fields)
+        return cls._filter_data(fields)
 
-    def get_id(self) -> int | BasicFieldValue:
-        return getattr(self, "genius_id", UNSET)
+    @classmethod
+    def get_primary_artist_id_col_name(cls) -> str:
+        return cls.get_fk_name_ref_single_pk_entity(GeniusArtistInfo)
 
-    def get_genius_url(self) -> str | BasicFieldValue:
-        return getattr(self, "genius_url", UNSET)
+    def get_primary_artist_id(self) -> int:
+        return self.get_fk_value_ref_single_pk_entity(GeniusArtistInfo)
 
-    def get_primary_artist_id(self) -> int | BasicFieldValue:
-        return getattr(self, "primary_artist_genius_id", UNSET)
+    def set_primary_artist_id(self, new_id: int) -> None:
+        self.set_fk_value_ref_single_pk_entity(GeniusArtistInfo, new_id)
+
+    @classmethod
+    def get_title_col_name(cls) -> str:
+        return "title"
+
+    def get_title(self) -> str:
+        title_col_name = self.get_title_col_name()
+        return self.get_field_value(title_col_name)
+
+    def set_title(self, new_title: str) -> None:
+        title_col_name = self.get_title_col_name()
+        self.set_field_value(title_col_name, new_title)
 
 
-class GeniusSongInfo(BaseEntity):
-    FIELD_META = GENIUS_SONG_INFO_TABLE_COL_META
+class GeniusSongInfo(GeniusEntity):
+    TABLE_META = GENIUS_SONG_INFO_TABLE_META
     PRIMARY_KEYS = GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS
     FOREIGN_KEYS = GENIUS_SONG_INFO_TABLE_FOREIGN_KEYS
     TABLE_NAME = GENIUS_SONG_INFO_TABLE_NAME
@@ -82,61 +131,57 @@ class GeniusSongInfo(BaseEntity):
         language: str | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "genius_id": song_genius_id,
-            "title": song_title,
-            "genius_url": song_genius_url,
-            "primary_artist_genius_id": primary_artist_genius_id,
-            "album_genius_id": album_genius_id,
+            cls.get_id_col_name(): song_genius_id,
+            cls.get_title_col_name(): song_title,
+            cls.get_genius_url_col_name(): song_genius_url,
+            cls.get_primary_artist_id_col_name(): primary_artist_genius_id,
+            cls.get_album_id_col_name(): album_genius_id,
             "release_date": release_date,
-            "image_url": song_image_url,
+            cls.get_image_url_col_name(): song_image_url,
             "apple_music_id": apple_music_id,
             "youtube_video_id": youtube_video_id,
             "language": language,
         }
-        return cls._filter_fields(fields)
+        return cls._filter_data(fields)
 
-    def get_id(self) -> int | BasicFieldValue:
-        return getattr(self, "genius_id", UNSET)
+    @classmethod
+    def get_primary_artist_id_col_name(cls) -> str:
+        return cls.get_fk_name_ref_single_pk_entity(GeniusArtistInfo)
 
-    def get_genius_url(self) -> str | BasicFieldValue:
-        return getattr(self, "genius_url", UNSET)
+    def get_primary_artist_id(self) -> int:
+        return self.get_fk_value_ref_single_pk_entity(GeniusArtistInfo)
 
-    def get_primary_artist_id(self) -> int | BasicFieldValue:
-        return getattr(self, "primary_artist_genius_id", UNSET)
+    def set_primary_artist_id(self, new_id: int) -> None:
+        self.set_fk_value_ref_single_pk_entity(GeniusArtistInfo, new_id)
 
-    def get_album_id(self) -> int | BasicFieldValue:
-        return getattr(self, "album_genius_id", UNSET)
+    @classmethod
+    def get_album_id_col_name(cls) -> str:
+        return cls.get_fk_name_ref_single_pk_entity(GeniusAlbumInfo)
+
+    def get_album_id(self) -> int:
+        return self.get_fk_value_ref_single_pk_entity(GeniusAlbumInfo)
+
+    def set_album_id(self, new_id: int) -> None:
+        self.set_fk_value_ref_single_pk_entity(GeniusAlbumInfo, new_id)
+
+    @classmethod
+    def get_title_col_name(cls) -> str:
+        return "title"
+
+    def get_title(self) -> str:
+        title_col_name = self.get_title_col_name()
+        return self.get_field_value(title_col_name)
+
+    def set_title(self, new_title: str) -> None:
+        title_col_name = self.get_title_col_name()
+        self.set_field_value(title_col_name, new_title)
 
 
-class GeniusDiscographyEntry(BaseEntity):
-    FIELD_META = GENIUS_DISCOGRAPHY_TABLE_COL_META
+class GeniusDiscographyEntry(BinaryAssociationEntity):
+    TABLE_META = GENIUS_DISCOGRAPHY_TABLE_META
     PRIMARY_KEYS = GENIUS_DISCOGRAPHY_TABLE_PRIMARY_KEYS
     FOREIGN_KEYS = GENIUS_DISCOGRAPHY_TABLE_FOREIGN_KEYS
     TABLE_NAME = GENIUS_DISCOGRAPHY_TABLE_NAME
-
-    def insert_to_db(
-        self,
-        cur: sqlite3.Cursor,
-        simulate: bool = False,
-        on_conflict: bool = False,
-    ) -> None:
-        super().insert_to_db(cur=cur, simulate=simulate, on_conflict=True)
-
-    def update_fields_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> bool:
-        raise NotImplementedError(
-            err_msg(
-                "this method is not implemented. "
-                "Use insert_to_db instead, as discography entries are immutable."
-            )
-        )
-
-    def upsert_to_db(self, cur: sqlite3.Cursor, simulate: bool = False) -> None:
-        raise NotImplementedError(
-            err_msg(
-                "this method is not implemented. "
-                "Use insert_to_db instead, as discography entries are immutable."
-            )
-        )
 
     @classmethod
     def make_init_data(
@@ -146,20 +191,34 @@ class GeniusDiscographyEntry(BaseEntity):
         song_genius_id: int | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "artist_genius_id": artist_genius_id,
-            "song_genius_id": song_genius_id,
+            cls.get_artist_id_col_name(): artist_genius_id,
+            cls.get_song_id_col_name(): song_genius_id,
         }
-        return cls._filter_fields(fields)
+        return cls._filter_data(fields)
 
-    def get_artist_id(self) -> int | BasicFieldValue:
-        return getattr(self, "artist_genius_id", UNSET)
+    @classmethod
+    def get_artist_id_col_name(cls) -> str:
+        return cls.get_fk_name_ref_single_pk_entity(GeniusArtistInfo)
 
-    def get_song_id(self) -> int | BasicFieldValue:
-        return getattr(self, "song_genius_id", UNSET)
+    def get_artist_id(self) -> int:
+        return self.get_fk_value_ref_single_pk_entity(GeniusArtistInfo)
+
+    def set_artist_id(self, new_id: int) -> None:
+        self.set_fk_value_ref_single_pk_entity(GeniusArtistInfo, new_id)
+
+    @classmethod
+    def get_song_id_col_name(cls) -> str:
+        return cls.get_fk_name_ref_single_pk_entity(GeniusSongInfo)
+
+    def get_song_id(self) -> int:
+        return self.get_fk_value_ref_single_pk_entity(GeniusSongInfo)
+
+    def set_song_id(self, new_id: int) -> None:
+        self.set_fk_value_ref_single_pk_entity(GeniusSongInfo, new_id)
 
 
-class GeniusArtistInfo(BaseEntity):
-    FIELD_META = GENIUS_ARTIST_INFO_TABLE_COL_META
+class GeniusArtistInfo(GeniusEntity):
+    TABLE_META = GENIUS_ARTIST_INFO_TABLE_META
     PRIMARY_KEYS = GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS
     FOREIGN_KEYS = GENIUS_ARTIST_INFO_TABLE_FOREIGN_KEYS
     TABLE_NAME = GENIUS_ARTIST_INFO_TABLE_NAME
@@ -170,12 +229,10 @@ class GeniusArtistInfo(BaseEntity):
         song: GeniusSongInfo,
         simulate: bool = False,
     ) -> None:
-        entry = GeniusDiscographyEntry(
-            data=GeniusDiscographyEntry.make_init_data(
-                artist_genius_id=self.get_id(),
-                song_genius_id=song.get_id(),
-            )
-        )
+        entry_data = {}
+        entry_data[GeniusDiscographyEntry.get_artist_id_col_name()] = self.get_id()
+        entry_data[GeniusDiscographyEntry.get_song_id_col_name()] = song.get_id()
+        entry = GeniusDiscographyEntry(data=entry_data)
         entry.insert_to_db(cur=cur, simulate=simulate)
 
     @classmethod
@@ -188,15 +245,21 @@ class GeniusArtistInfo(BaseEntity):
         artist_image_url: str | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "genius_id": artist_genius_id,
-            "name": artist_name,
-            "genius_url": artist_genius_url,
-            "image_url": artist_image_url,
+            cls.get_id_col_name(): artist_genius_id,
+            cls.get_name_col_name(): artist_name,
+            cls.get_genius_url_col_name(): artist_genius_url,
+            cls.get_image_url_col_name(): artist_image_url,
         }
-        return cls._filter_fields(fields)
+        return cls._filter_data(fields)
 
-    def get_id(self) -> int | BasicFieldValue:
-        return getattr(self, "genius_id", UNSET)
+    @classmethod
+    def get_name_col_name(cls) -> str:
+        return "name"
 
-    def get_genius_url(self) -> str | BasicFieldValue:
-        return getattr(self, "genius_url", UNSET)
+    def get_name(self) -> str:
+        name_col_name = self.get_name_col_name()
+        return self.get_field_value(name_col_name)
+
+    def set_name(self, new_name: str) -> None:
+        name_col_name = self.get_name_col_name()
+        self.set_field_value(name_col_name, new_name)

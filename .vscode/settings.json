@@ -14,6 +14,7 @@
     "flac",
     "ipados",
     "lyricsgenius",
+    "mcls",
     "osrelease",
     "specfilter",
     "TALB",
@@ -24,5 +25,21 @@
     "TRCK",
     "TYER",
     "ufffd"
+  ],
+  "ruff.lint.ignore": [
+    "ANN002",
+    "ANN003",
+    "ANN201",
+    "ANN204",
+    "ANN401",
+    "B007",
+    "B905",
+    "C408",
+    "E203",
+    "E501",
+    "E722",
+    "E731",
+    "N812",
+    "UP007"
   ]
 }

@@ -1,9 +1,19 @@
-from ..core import (
+from typing import Final
+
+from ..core.constants import CONCAT
+from ..core.typing import (
+    CreateStatement,
+    FieldMeta,
+    ForeignKeyMapping,
+    PrimaryKeyNames,
+    TableMeta,
+    TableName,
+)
+from ..core.utils import (
     CHECK_ALPHANUMERIC_GLOB,
     CHECK_ISO_FULL_DATE_GLOB,
     CHECK_ISO_YEAR_GLOB,
     CHECK_ISO_YEAR_MONTH_GLOB,
-    CONCAT,
 )
 from ..genius.tables import (
     GENIUS_ALBUM_INFO_TABLE_NAME,
@@ -39,16 +49,18 @@ def spotify_id_to_url(column: str, concat: str, entity: str) -> str:
         raise ValueError(f"Unknown entity type: {entity}")
 
 
-CHECK_ID_GLOB = lambda id: f"length({id}) = 22 AND {CHECK_ALPHANUMERIC_GLOB(col=id)}"
+def CHECK_SPOTIFY_ID_GLOB(id: str) -> str:  # noqa: N802
+    return f"length({id}) = 22 AND {CHECK_ALPHANUMERIC_GLOB(col=id)}"
+
 
 # ---- SPOTIFY TABLES + EXTENDED METADATA ---- #
 
 # Artists Table
-ARTISTS_TABLE_NAME = "artists"
-ARTISTS_TABLE = f"""
+ARTISTS_TABLE_NAME: Final[TableName] = "artists"
+ARTISTS_TABLE: Final[CreateStatement] = f"""
 CREATE TABLE IF NOT EXISTS {ARTISTS_TABLE_NAME} (
     artist_id       TEXT PRIMARY KEY
-                        CHECK ({CHECK_ID_GLOB(id="artist_id")}),
+                        CHECK ({CHECK_SPOTIFY_ID_GLOB(id="artist_id")}),
     name            TEXT NOT NULL
                         CHECK (name <> ''),
     genius_id       INTEGER
@@ -66,27 +78,29 @@ CREATE TABLE IF NOT EXISTS {ARTISTS_TABLE_NAME} (
     FOREIGN KEY (genius_id)
         REFERENCES {GENIUS_ARTIST_INFO_TABLE_NAME}({GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS[0]})
         ON DELETE SET NULL
-);
+) STRICT;
 """
-ARTISTS_TABLE_PRIMARY_KEYS = ("artist_id",)
-ARTISTS_TABLE_FOREIGN_KEYS = {
-    GENIUS_ARTIST_INFO_TABLE_NAME: "genius_id",
+ARTISTS_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("artist_id",)
+ARTISTS_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
+    GENIUS_ARTIST_INFO_TABLE_NAME: {
+        GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS[0]: "genius_id",
+    },
 }
-ARTISTS_TABLE_COL_META = {
-    "artist_id": (True, str),
-    "name": (True, str),
-    "genius_id": (False, int),
-    "total_followers": (False, int),
-    "genres": (False, str),
-    "popularity": (False, int),
+ARTISTS_TABLE_META: Final[TableMeta] = {
+    "artist_id": FieldMeta(py_type=str, nullable=False),
+    "name": FieldMeta(py_type=str, nullable=False),
+    "genius_id": FieldMeta(py_type=int, nullable=True),
+    "total_followers": FieldMeta(py_type=int, nullable=True),
+    "genres": FieldMeta(py_type=str, nullable=True),
+    "popularity": FieldMeta(py_type=int, nullable=True),
 }
 
 # Albums Table
-ALBUMS_TABLE_NAME = "albums"
-ALBUMS_TABLE = f"""
+ALBUMS_TABLE_NAME: Final[TableName] = "albums"
+ALBUMS_TABLE: Final[CreateStatement] = f"""
 CREATE TABLE IF NOT EXISTS {ALBUMS_TABLE_NAME} (
     album_id               TEXT PRIMARY KEY
-                               CHECK ({CHECK_ID_GLOB(id="album_id")}),
+                               CHECK ({CHECK_SPOTIFY_ID_GLOB(id="album_id")}),
     title                  TEXT NOT NULL
                                CHECK (title <> ''),
     genius_id              INTEGER
@@ -124,31 +138,35 @@ CREATE TABLE IF NOT EXISTS {ALBUMS_TABLE_NAME} (
     FOREIGN KEY (primary_artist_id)
         REFERENCES {ARTISTS_TABLE_NAME}({ARTISTS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT
-);
+) STRICT;
 """
-ALBUMS_TABLE_PRIMARY_KEYS = ("album_id",)
-ALBUMS_TABLE_FOREIGN_KEYS = {
-    GENIUS_ALBUM_INFO_TABLE_NAME: "genius_id",
-    ARTISTS_TABLE_NAME: "primary_artist_id",
+ALBUMS_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("album_id",)
+ALBUMS_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
+    GENIUS_ALBUM_INFO_TABLE_NAME: {
+        GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS[0]: "genius_id",
+    },
+    ARTISTS_TABLE_NAME: {
+        ARTISTS_TABLE_PRIMARY_KEYS[0]: "primary_artist_id",
+    },
 }
-ALBUMS_TABLE_COL_META = {
-    "album_id": (True, str),
-    "title": (True, str),
-    "genius_id": (False, int),
-    "primary_artist_id": (True, str),
-    "album_type": (True, str),
-    "total_tracks": (True, int),
-    "release_date": (True, str),
-    "label": (False, str),
-    "popularity": (False, int),
+ALBUMS_TABLE_META: Final[TableMeta] = {
+    "album_id": FieldMeta(py_type=str, nullable=False),
+    "title": FieldMeta(py_type=str, nullable=False),
+    "genius_id": FieldMeta(py_type=int, nullable=True),
+    "primary_artist_id": FieldMeta(py_type=str, nullable=False),
+    "album_type": FieldMeta(py_type=str, nullable=False),
+    "total_tracks": FieldMeta(py_type=int, nullable=False),
+    "release_date": FieldMeta(py_type=str, nullable=False),
+    "label": FieldMeta(py_type=str, nullable=True),
+    "popularity": FieldMeta(py_type=int, nullable=True),
 }
 
 # Songs Table
-SONGS_TABLE_NAME = "songs"
-SONGS_TABLE = f"""
+SONGS_TABLE_NAME: Final[TableName] = "songs"
+SONGS_TABLE: Final[CreateStatement] = f"""
 CREATE TABLE IF NOT EXISTS {SONGS_TABLE_NAME} (
     track_id          TEXT PRIMARY KEY
-                          CHECK ({CHECK_ID_GLOB(id="track_id")}),
+                          CHECK ({CHECK_SPOTIFY_ID_GLOB(id="track_id")}),
     title             TEXT NOT NULL
                           CHECK (title <> ''),
     genius_id         INTEGER
@@ -180,30 +198,36 @@ CREATE TABLE IF NOT EXISTS {SONGS_TABLE_NAME} (
     FOREIGN KEY (album_id)
         REFERENCES {ALBUMS_TABLE_NAME}({ALBUMS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT
-);
+) STRICT;
 """
-SONGS_TABLE_PRIMARY_KEYS = ("track_id",)
-SONGS_TABLE_FOREIGN_KEYS = {
-    GENIUS_SONG_INFO_TABLE_NAME: "genius_id",
-    ARTISTS_TABLE_NAME: "primary_artist_id",
-    ALBUMS_TABLE_NAME: "album_id",
+SONGS_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("track_id",)
+SONGS_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
+    GENIUS_SONG_INFO_TABLE_NAME: {
+        GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS[0]: "genius_id",
+    },
+    ARTISTS_TABLE_NAME: {
+        ARTISTS_TABLE_PRIMARY_KEYS[0]: "primary_artist_id",
+    },
+    ALBUMS_TABLE_NAME: {
+        ALBUMS_TABLE_PRIMARY_KEYS[0]: "album_id",
+    },
 }
-SONGS_TABLE_COL_META = {
-    "track_id": (True, str),
-    "title": (True, str),
-    "genius_id": (False, int),
-    "primary_artist_id": (True, str),
-    "album_id": (True, str),
-    "disc_number": (True, int),
-    "track_number": (True, int),
-    "duration_ms": (True, int),
-    "explicit": (True, bool),
-    "popularity": (True, int),
+SONGS_TABLE_META: Final[TableMeta] = {
+    "track_id": FieldMeta(py_type=str, nullable=False),
+    "title": FieldMeta(py_type=str, nullable=False),
+    "genius_id": FieldMeta(py_type=int, nullable=True),
+    "primary_artist_id": FieldMeta(py_type=str, nullable=False),
+    "album_id": FieldMeta(py_type=str, nullable=False),
+    "disc_number": FieldMeta(py_type=int, nullable=False),
+    "track_number": FieldMeta(py_type=int, nullable=False),
+    "duration_ms": FieldMeta(py_type=int, nullable=False),
+    "explicit": FieldMeta(py_type=bool, nullable=False),
+    "popularity": FieldMeta(py_type=int, nullable=False),
 }
 
 # Discography Table
-DISCOGRAPHY_TABLE_NAME = "discography"
-DISCOGRAPHY_TABLE = f"""
+DISCOGRAPHY_TABLE_NAME: Final[TableName] = "discography"
+DISCOGRAPHY_TABLE: Final[CreateStatement] = f"""
 CREATE TABLE IF NOT EXISTS {DISCOGRAPHY_TABLE_NAME} (
     artist_id TEXT NOT NULL,
     track_id  TEXT NOT NULL,
@@ -217,21 +241,25 @@ CREATE TABLE IF NOT EXISTS {DISCOGRAPHY_TABLE_NAME} (
     FOREIGN KEY (track_id)
         REFERENCES {SONGS_TABLE_NAME}({SONGS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
-);
+) STRICT;
 """
-DISCOGRAPHY_TABLE_PRIMARY_KEYS = ("artist_id", "track_id")
-DISCOGRAPHY_TABLE_FOREIGN_KEYS = {
-    ARTISTS_TABLE_NAME: "artist_id",
-    SONGS_TABLE_NAME: "track_id",
+DISCOGRAPHY_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("artist_id", "track_id")
+DISCOGRAPHY_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
+    ARTISTS_TABLE_NAME: {
+        ARTISTS_TABLE_PRIMARY_KEYS[0]: "artist_id",
+    },
+    SONGS_TABLE_NAME: {
+        SONGS_TABLE_PRIMARY_KEYS[0]: "track_id",
+    },
 }
-DISCOGRAPHY_TABLE_COL_META = {
-    "artist_id": (True, str),
-    "track_id": (True, str),
+DISCOGRAPHY_TABLE_META: Final[TableMeta] = {
+    "artist_id": FieldMeta(py_type=str, nullable=False),
+    "track_id": FieldMeta(py_type=str, nullable=False),
 }
 
 # Artist Images Table
-ARTIST_IMAGES_TABLE_NAME = "artist_images"
-ARTIST_IMAGES_TABLE = f"""
+ARTIST_IMAGES_TABLE_NAME: Final[TableName] = "artist_images"
+ARTIST_IMAGES_TABLE: Final[CreateStatement] = f"""
 CREATE TABLE IF NOT EXISTS {ARTIST_IMAGES_TABLE_NAME} (
     artist_id TEXT NOT NULL,
     url       TEXT NOT NULL
@@ -249,22 +277,24 @@ CREATE TABLE IF NOT EXISTS {ARTIST_IMAGES_TABLE_NAME} (
     FOREIGN KEY (artist_id)
         REFERENCES {ARTISTS_TABLE_NAME}({ARTISTS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
-);
+) STRICT;
 """
-ARTIST_IMAGES_TABLE_PRIMARY_KEYS = ("artist_id", "url")
-ARTIST_IMAGES_TABLE_FOREIGN_KEYS = {
-    ARTISTS_TABLE_NAME: "artist_id",
+ARTIST_IMAGES_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("artist_id", "url")
+ARTIST_IMAGES_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
+    ARTISTS_TABLE_NAME: {
+        ARTISTS_TABLE_PRIMARY_KEYS[0]: "artist_id",
+    },
 }
-ARTIST_IMAGES_TABLE_COL_META = {
-    "artist_id": (True, str),
-    "url": (True, str),
-    "width": (False, int),
-    "height": (False, int),
+ARTIST_IMAGES_TABLE_META: Final[TableMeta] = {
+    "artist_id": FieldMeta(py_type=str, nullable=False),
+    "url": FieldMeta(py_type=str, nullable=False),
+    "width": FieldMeta(py_type=int, nullable=True),
+    "height": FieldMeta(py_type=int, nullable=True),
 }
 
 # Album Images Table
-ALBUM_IMAGES_TABLE_NAME = "album_images"
-ALBUM_IMAGES_TABLE = f"""
+ALBUM_IMAGES_TABLE_NAME: Final[TableName] = "album_images"
+ALBUM_IMAGES_TABLE: Final[CreateStatement] = f"""
 CREATE TABLE IF NOT EXISTS {ALBUM_IMAGES_TABLE_NAME} (
     album_id  TEXT NOT NULL,
     url       TEXT NOT NULL
@@ -282,21 +312,23 @@ CREATE TABLE IF NOT EXISTS {ALBUM_IMAGES_TABLE_NAME} (
     FOREIGN KEY (album_id)
         REFERENCES {ALBUMS_TABLE_NAME}({ALBUMS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
-);
+) STRICT;
 """
-ALBUM_IMAGES_TABLE_PRIMARY_KEYS = ("album_id", "url")
-ALBUM_IMAGES_TABLE_FOREIGN_KEYS = {
-    ALBUMS_TABLE_NAME: "album_id",
+ALBUM_IMAGES_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("album_id", "url")
+ALBUM_IMAGES_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
+    ALBUMS_TABLE_NAME: {
+        ALBUMS_TABLE_PRIMARY_KEYS[0]: "album_id",
+    },
 }
-ALBUM_IMAGES_TABLE_COL_META = {
-    "album_id": (True, str),
-    "url": (True, str),
-    "width": (False, int),
-    "height": (False, int),
+ALBUM_IMAGES_TABLE_META: Final[TableMeta] = {
+    "album_id": FieldMeta(py_type=str, nullable=False),
+    "url": FieldMeta(py_type=str, nullable=False),
+    "width": FieldMeta(py_type=int, nullable=True),
+    "height": FieldMeta(py_type=int, nullable=True),
 }
 
 # All Tables Creation Statements in Order of Dependencies
-TABLES = [
+TABLES: Final[list[CreateStatement]] = [
     ARTISTS_TABLE,
     ALBUMS_TABLE,
     SONGS_TABLE,
