@@ -149,8 +149,8 @@ def get_joint_songs_for_artists(
         key=lambda song: (
             song[Song.get_primary_artist_id_col_name()],
             song[Song.get_album_id_col_name()],
-            song["disc_number"],
-            song["track_number"],
+            song[Song.get_disc_number_col_name()],
+            song[Song.get_track_number_col_name()],
         )
     )
 

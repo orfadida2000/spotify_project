@@ -2,7 +2,7 @@
 import re
 from enum import StrEnum
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 from sp2genius.constants.path import ENV_DIR_PATH
 from sp2genius.utils.path import is_file
@@ -12,10 +12,14 @@ SPOTIFY_ID_RE: Final[re.Pattern[str]] = re.compile(pattern=r"[A-Za-z0-9]{22}")
 SPOTIFY_TRACK_URL_RE: Final[re.Pattern[str]] = re.compile(
     pattern=f"^https://open.spotify.com/track/({SPOTIFY_ID_RE.pattern})$"
 )
+SPOTIFY_RELEASE_DATE_PATTERNS: Final[list[re.Pattern[str]]] = [
+    re.compile(pattern=r"^\d{4}$"),  # YYYY
+    re.compile(pattern=r"^\d{4}-\d{2}$"),  # YYYY-MM
+    re.compile(pattern=r"^\d{4}-\d{2}-\d{2}$"),  # YYYY-MM-DD
+]
+
 BASE_API_URL: Final[str] = "https://api.spotify.com/v1"
 MAX_ALBUMS_PER_REQUEST: Final[int] = 20
-MAX_ARTISTS_PER_REQUEST: Final[int] = 50
-MAX_TRACKS_PER_REQUEST: Final[int] = 50
 MAX_LIMIT: Final[int] = 50
 TIMEOUT: Final[int] = 10
 AVAILABLE_MARKETS: Final[set[str]] = {
@@ -224,9 +228,86 @@ SPOTIFY_ENV_PATH: Final[Path] = _temp_path
 SP_TRACK: Final[str] = "https://api.spotify.com/v1/tracks/{track_id}"
 BASE_TRACK_URL: Final[str] = "https://open.spotify.com/track/{track_id}"
 
+NONE_TYPE: Final[type] = type(None)
+
 
 class ArtistIncludeGroups(StrEnum):
     ALBUM = "album"
     SINGLE = "single"
     APPEARS_ON = "appears_on"
     COMPILATION = "compilation"
+
+
+IMAGE_SPECS: Final[dict[str, Any]] = {
+    "url": str,
+    "height": (int, NONE_TYPE),
+    "width": (int, NONE_TYPE),
+}
+IMAGE_FIELD_REQUIREMENTS: Final[dict[str, bool]] = {
+    "url": True,
+    "height": False,
+    "width": False,
+}
+
+ARTIST_SPECS: Final[dict[str, Any]] = {
+    "followers": {"total": int},
+    "genres": [str],
+    "id": str,
+    "images": [IMAGE_SPECS],
+    "name": str,
+    "popularity": int,
+}
+ARTIST_FIELD_REQUIREMENTS: Final[dict[str, bool]] = {
+    "followers": False,
+    "genres": False,
+    "id": True,
+    "images": False,
+    "name": True,
+    "popularity": False,
+}
+
+ALBUM_SPECS: Final[dict[str, Any]] = {
+    "album_type": str,
+    "total_tracks": int,
+    "id": str,
+    "images": [IMAGE_SPECS],
+    "name": str,
+    "release_date": str,
+    "artists": [ARTIST_SPECS],
+    "label": str,
+    "popularity": int,
+}
+ALBUM_FIELD_REQUIREMENTS: Final[dict[str, bool]] = {
+    "album_type": True,
+    "total_tracks": True,
+    "id": True,
+    "images": False,
+    "name": True,
+    "release_date": True,
+    "artists": True,
+    "label": False,
+    "popularity": False,
+}
+
+TRACK_SPECS: Final[dict[str, Any]] = {
+    "album": ALBUM_SPECS,
+    "artists": [ARTIST_SPECS],
+    "disc_number": int,
+    "duration_ms": int,
+    "explicit": bool,
+    "id": str,
+    "name": str,
+    "popularity": int,
+    "track_number": int,
+}
+TRACK_FIELD_REQUIREMENTS: Final[dict[str, bool]] = {
+    "album": True,
+    "artists": True,
+    "disc_number": True,
+    "duration_ms": True,
+    "explicit": True,
+    "id": True,
+    "name": True,
+    "popularity": False,
+    "track_number": True,
+}

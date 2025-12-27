@@ -2,7 +2,7 @@ import sqlite3
 
 from sp2genius.utils import err_msg
 
-from ..core.base import BaseEntity, BinaryAssociationEntity, SinglePkEntity
+from ..core.base import BinaryAssociationEntity, DependentRowEntity, SinglePkEntity
 from ..core.constants import UNSET
 from ..core.typing import BasicFieldValue
 from ..genius.entities import GeniusAlbumInfo, GeniusArtistInfo, GeniusEntity, GeniusSongInfo
@@ -102,12 +102,14 @@ class SpotifyEntity(SinglePkEntity):
         return self.get_fk_value_ref_single_pk_entity(genius_entity_cls)
 
     def set_genius_id(
-        self, genius_entity_cls: type[GeniusEntity], genius_id: int | BasicFieldValue
+        self,
+        new_id: int | BasicFieldValue,
+        genius_entity_cls: type[GeniusEntity],
     ) -> None:
-        self.set_fk_value_ref_single_pk_entity(genius_entity_cls, genius_id)
+        self.set_fk_value_ref_single_pk_entity(genius_entity_cls, new_id)
 
 
-class ArtistImage(BaseEntity):
+class ArtistImage(DependentRowEntity):
     TABLE_META = ARTIST_IMAGES_TABLE_META
     PRIMARY_KEYS = ARTIST_IMAGES_TABLE_PRIMARY_KEYS
     FOREIGN_KEYS = ARTIST_IMAGES_TABLE_FOREIGN_KEYS
@@ -123,8 +125,8 @@ class ArtistImage(BaseEntity):
         image_height: int | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "artist_id": artist_spotify_id,
-            "url": image_url,
+            cls.get_artist_id_col_name(): artist_spotify_id,
+            cls.get_url_col_name(): image_url,
             "width": image_width,
             "height": image_height,
         }
@@ -132,19 +134,24 @@ class ArtistImage(BaseEntity):
 
     @classmethod
     def get_artist_id_col_name(cls) -> str:
-        return "artist_id"
+        return cls.get_fk_name_ref_single_pk_entity(Artist)
 
     def get_artist_id(self) -> str:
-        artist_id_col_name = self.get_artist_id_col_name()
-        return self.get_field_value(artist_id_col_name)
+        return self.get_fk_value_ref_single_pk_entity(Artist)
 
     def set_artist_id(self, new_id: str) -> None:
-        artist_id_col_name = self.get_artist_id_col_name()
-        self.set_field_value(artist_id_col_name, new_id)
+        self.set_fk_value_ref_single_pk_entity(Artist, new_id)
 
     @classmethod
     def get_url_col_name(cls) -> str:
-        return "url"
+        pk_names_set = set(cls.get_pk_names())
+        artist_id_col_name = cls.get_artist_id_col_name()
+        assert artist_id_col_name in pk_names_set and len(pk_names_set) == 2, err_msg(
+            "ArtistImage must have exactly two primary keys: artist_id and url."
+        )
+        pk_names_set.remove(artist_id_col_name)
+        url_col_name = next(iter(pk_names_set))
+        return url_col_name
 
     def get_url(self) -> str:
         url_col_name = self.get_url_col_name()
@@ -155,7 +162,7 @@ class ArtistImage(BaseEntity):
         self.set_field_value(url_col_name, new_url)
 
 
-class AlbumImage(BaseEntity):
+class AlbumImage(DependentRowEntity):
     TABLE_META = ALBUM_IMAGES_TABLE_META
     PRIMARY_KEYS = ALBUM_IMAGES_TABLE_PRIMARY_KEYS
     FOREIGN_KEYS = ALBUM_IMAGES_TABLE_FOREIGN_KEYS
@@ -171,8 +178,8 @@ class AlbumImage(BaseEntity):
         image_height: int | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "album_id": album_spotify_id,
-            "url": image_url,
+            cls.get_album_id_col_name(): album_spotify_id,
+            cls.get_url_col_name(): image_url,
             "width": image_width,
             "height": image_height,
         }
@@ -180,7 +187,7 @@ class AlbumImage(BaseEntity):
 
     @classmethod
     def get_album_id_col_name(cls) -> str:
-        return "album_id"
+        return cls.get_fk_name_ref_single_pk_entity(Album)
 
     def get_album_id(self) -> str:
         album_id_col_name = self.get_album_id_col_name()
@@ -192,7 +199,14 @@ class AlbumImage(BaseEntity):
 
     @classmethod
     def get_url_col_name(cls) -> str:
-        return "url"
+        pk_names_set = set(cls.get_pk_names())
+        album_id_col_name = cls.get_album_id_col_name()
+        assert album_id_col_name in pk_names_set and len(pk_names_set) == 2, err_msg(
+            "AlbumImage must have exactly two primary keys: album_id and url."
+        )
+        pk_names_set.remove(album_id_col_name)
+        url_col_name = next(iter(pk_names_set))
+        return url_col_name
 
     def get_url(self) -> str:
         url_col_name = self.get_url_col_name()
@@ -208,6 +222,7 @@ class Album(SpotifyEntity):
     PRIMARY_KEYS = ALBUMS_TABLE_PRIMARY_KEYS
     FOREIGN_KEYS = ALBUMS_TABLE_FOREIGN_KEYS
     TABLE_NAME = ALBUMS_TABLE_NAME
+    SPOTIFY_ENTITY_NAME = "album"
 
     def register_image(
         self,
@@ -234,10 +249,10 @@ class Album(SpotifyEntity):
         popularity: int | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "album_id": album_spotify_id,
-            "title": album_title,
-            "genius_id": album_genius_id,
-            "primary_artist_id": primary_artist_id,
+            cls.get_id_col_name(): album_spotify_id,
+            cls.get_title_col_name(): album_title,
+            cls.get_genius_id_col_name(): album_genius_id,
+            cls.get_primary_artist_id_col_name(): primary_artist_id,
             "album_type": album_type,
             "total_tracks": total_tracks,
             "release_date": release_date,
@@ -247,14 +262,24 @@ class Album(SpotifyEntity):
         return cls._filter_data(fields)
 
     @classmethod
-    def get_genius_id_col_name(cls) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def get_genius_id_col_name(
+        cls,
+        genius_entity_cls: type[GeniusEntity] | None = None,
+    ) -> str:
         return super().get_genius_id_col_name(GeniusAlbumInfo)
 
-    def get_genius_id(self) -> int | BasicFieldValue:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def get_genius_id(
+        self,
+        genius_entity_cls: type[GeniusEntity] | None = None,
+    ) -> int | BasicFieldValue:
         return super().get_genius_id(GeniusAlbumInfo)
 
-    def set_genius_id(self, new_id: int | BasicFieldValue) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
-        super().set_genius_id(GeniusAlbumInfo, new_id)
+    def set_genius_id(
+        self,
+        new_id: int | BasicFieldValue,
+        genius_entity_cls: type[GeniusEntity] | None = None,
+    ) -> None:
+        super().set_genius_id(new_id, GeniusAlbumInfo)
 
     @classmethod
     def get_primary_artist_id_col_name(cls) -> str:
@@ -284,6 +309,7 @@ class Song(SpotifyEntity):
     PRIMARY_KEYS = SONGS_TABLE_PRIMARY_KEYS
     FOREIGN_KEYS = SONGS_TABLE_FOREIGN_KEYS
     TABLE_NAME = SONGS_TABLE_NAME
+    SPOTIFY_ENTITY_NAME = "track"
 
     @classmethod
     def make_init_data(
@@ -301,13 +327,13 @@ class Song(SpotifyEntity):
         popularity: int | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "track_id": track_spotify_id,
-            "title": track_title,
-            "genius_id": song_genius_id,
-            "primary_artist_id": primary_artist_id,
-            "album_id": album_spotify_id,
-            "disc_number": disc_number,
-            "track_number": track_number,
+            cls.get_id_col_name(): track_spotify_id,
+            cls.get_title_col_name(): track_title,
+            cls.get_genius_id_col_name(GeniusSongInfo): song_genius_id,
+            cls.get_primary_artist_id_col_name(): primary_artist_id,
+            cls.get_album_id_col_name(): album_spotify_id,
+            cls.get_disc_number_col_name(): disc_number,
+            cls.get_track_number_col_name(): track_number,
             "duration_ms": duration_ms,
             "explicit": explicit,
             "popularity": popularity,
@@ -315,14 +341,21 @@ class Song(SpotifyEntity):
         return cls._filter_data(fields)
 
     @classmethod
-    def get_genius_id_col_name(cls) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def get_genius_id_col_name(cls, genius_entity_cls: type[GeniusEntity] | None = None) -> str:
         return super().get_genius_id_col_name(GeniusSongInfo)
 
-    def get_genius_id(self) -> int | BasicFieldValue:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def get_genius_id(
+        self,
+        genius_entity_cls: type[GeniusEntity] | None = None,
+    ) -> int | BasicFieldValue:
         return super().get_genius_id(GeniusSongInfo)
 
-    def set_genius_id(self, new_id: int | BasicFieldValue) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
-        super().set_genius_id(GeniusSongInfo, new_id)
+    def set_genius_id(
+        self,
+        new_id: int | BasicFieldValue,
+        genius_entity_cls: type[GeniusEntity] | None = None,
+    ) -> None:
+        super().set_genius_id(new_id, GeniusSongInfo)
 
     @classmethod
     def get_primary_artist_id_col_name(cls) -> str:
@@ -356,6 +389,30 @@ class Song(SpotifyEntity):
         title_col_name = self.get_title_col_name()
         self.set_field_value(title_col_name, new_title)
 
+    @classmethod
+    def get_disc_number_col_name(cls) -> str:
+        return "disc_number"
+
+    def get_disc_number(self) -> int:
+        disc_number_col_name = self.get_disc_number_col_name()
+        return self.get_field_value(disc_number_col_name)
+
+    def set_disc_number(self, new_disc_number: int) -> None:
+        disc_number_col_name = self.get_disc_number_col_name()
+        self.set_field_value(disc_number_col_name, new_disc_number)
+
+    @classmethod
+    def get_track_number_col_name(cls) -> str:
+        return "track_number"
+
+    def get_track_number(self) -> int:
+        track_number_col_name = self.get_track_number_col_name()
+        return self.get_field_value(track_number_col_name)
+
+    def set_track_number(self, new_track_number: int) -> None:
+        track_number_col_name = self.get_track_number_col_name()
+        self.set_field_value(track_number_col_name, new_track_number)
+
 
 class DiscographyEntry(BinaryAssociationEntity):
     TABLE_META = DISCOGRAPHY_TABLE_META
@@ -371,8 +428,8 @@ class DiscographyEntry(BinaryAssociationEntity):
         track_spotify_id: str | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "artist_id": artist_spotify_id,
-            "track_id": track_spotify_id,
+            cls.get_artist_id_col_name(): artist_spotify_id,
+            cls.get_song_id_col_name(): track_spotify_id,
         }
         return cls._filter_data(fields)
 
@@ -402,6 +459,7 @@ class Artist(SpotifyEntity):
     PRIMARY_KEYS = ARTISTS_TABLE_PRIMARY_KEYS
     FOREIGN_KEYS = ARTISTS_TABLE_FOREIGN_KEYS
     TABLE_NAME = ARTISTS_TABLE_NAME
+    SPOTIFY_ENTITY_NAME = "artist"
 
     def register_discography_entry(
         self,
@@ -409,9 +467,10 @@ class Artist(SpotifyEntity):
         song: Song,
         simulate: bool = False,
     ) -> None:
-        entry_data = {}
-        entry_data[DiscographyEntry.get_artist_id_col_name()] = self.get_id()
-        entry_data[DiscographyEntry.get_song_id_col_name()] = song.get_id()
+        entry_data = DiscographyEntry.make_init_data(
+            artist_spotify_id=self.get_id(),
+            track_spotify_id=song.get_id(),
+        )
         entry = DiscographyEntry(data=entry_data)
         entry.insert_to_db(cur=cur, simulate=simulate)
 
@@ -437,9 +496,9 @@ class Artist(SpotifyEntity):
         popularity: int | BasicFieldValue = UNSET,
     ) -> dict:
         fields = {
-            "artist_id": artist_spotify_id,
-            "name": artist_name,
-            "genius_id": artist_genius_id,
+            cls.get_id_col_name(): artist_spotify_id,
+            cls.get_name_col_name(): artist_name,
+            cls.get_genius_id_col_name(): artist_genius_id,
             "total_followers": total_followers,
             "genres": genres,
             "popularity": popularity,
@@ -447,14 +506,21 @@ class Artist(SpotifyEntity):
         return cls._filter_data(fields)
 
     @classmethod
-    def get_genius_id_col_name(cls) -> str:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def get_genius_id_col_name(cls, genius_entity_cls: type[GeniusEntity] | None = None) -> str:
         return super().get_genius_id_col_name(GeniusArtistInfo)
 
-    def get_genius_id(self) -> int | BasicFieldValue:  # pyright: ignore[reportIncompatibleMethodOverride]
+    def get_genius_id(
+        self,
+        genius_entity_cls: type[GeniusEntity] | None = None,
+    ) -> int | BasicFieldValue:
         return super().get_genius_id(GeniusArtistInfo)
 
-    def set_genius_id(self, new_id: int | BasicFieldValue) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
-        super().set_genius_id(GeniusArtistInfo, new_id)
+    def set_genius_id(
+        self,
+        new_id: int | BasicFieldValue,
+        genius_entity_cls: type[GeniusEntity] | None = None,
+    ) -> None:
+        super().set_genius_id(new_id, GeniusArtistInfo)
 
     @classmethod
     def get_name_col_name(cls) -> str:

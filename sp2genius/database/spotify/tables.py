@@ -181,8 +181,8 @@ CREATE TABLE IF NOT EXISTS {SONGS_TABLE_NAME} (
                           CHECK (duration_ms > 0),
     explicit          INTEGER NOT NULL
                           CHECK (explicit IN (0, 1)),
-    popularity        INTEGER NOT NULL
-                          CHECK (popularity >= 0 AND popularity <= 100),
+    popularity        INTEGER
+                          CHECK (popularity IS NULL OR (popularity >= 0 AND popularity <= 100)),
     spotify_url       TEXT GENERATED ALWAYS AS (
                           {spotify_id_to_url(column="track_id", concat=CONCAT, entity="track")}
                       ) VIRTUAL,
@@ -222,7 +222,7 @@ SONGS_TABLE_META: Final[TableMeta] = {
     "track_number": FieldMeta(py_type=int, nullable=False),
     "duration_ms": FieldMeta(py_type=int, nullable=False),
     "explicit": FieldMeta(py_type=bool, nullable=False),
-    "popularity": FieldMeta(py_type=int, nullable=False),
+    "popularity": FieldMeta(py_type=int, nullable=True),
 }
 
 # Discography Table

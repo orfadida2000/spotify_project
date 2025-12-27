@@ -7,9 +7,7 @@ from .constants import (
     AVAILABLE_MARKETS,
     BASE_API_URL,
     MAX_ALBUMS_PER_REQUEST,
-    MAX_ARTISTS_PER_REQUEST,
     MAX_LIMIT,
-    MAX_TRACKS_PER_REQUEST,
     SPOTIFY_ID_RE,
     TIMEOUT,
     ArtistIncludeGroups,
@@ -118,10 +116,8 @@ def get_artist(artist_id: str) -> dict[str, Any]:
 def get_artists(artist_ids: list[str]) -> dict[str, Any]:
     if not isinstance(artist_ids, list) or not all(is_valid_spotify_id(id_) for id_ in artist_ids):
         raise TypeError("artist_ids must be a list of valid Spotify IDs")
-    if len(artist_ids) == 0 or len(artist_ids) > MAX_ARTISTS_PER_REQUEST:
-        raise ValueError(
-            f"artist_ids list must contain between 1 and {MAX_ARTISTS_PER_REQUEST} IDs"
-        )
+    if len(artist_ids) == 0 or len(artist_ids) > MAX_LIMIT:
+        raise ValueError(f"artist_ids list must contain between 1 and {MAX_LIMIT} IDs")
 
     path = "/artists"
     params = {"ids": ",".join(artist_ids)}
@@ -203,8 +199,8 @@ def get_track(track_id: str, market: str | None = None) -> dict[str, Any]:
 def get_tracks(track_ids: list[str], market: str | None = None) -> dict[str, Any]:
     if not isinstance(track_ids, list) or not all(is_valid_spotify_id(id_) for id_ in track_ids):
         raise TypeError("track_ids must be a list of valid Spotify IDs")
-    if len(track_ids) == 0 or len(track_ids) > MAX_TRACKS_PER_REQUEST:
-        raise ValueError(f"track_ids list must contain between 1 and {MAX_TRACKS_PER_REQUEST} IDs")
+    if len(track_ids) == 0 or len(track_ids) > MAX_LIMIT:
+        raise ValueError(f"track_ids list must contain between 1 and {MAX_LIMIT} IDs")
 
     path = "/tracks"
     params: dict[str, Any] = {"ids": ",".join(track_ids)}

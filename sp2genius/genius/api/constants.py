@@ -27,10 +27,10 @@ MEDIA_SPECS: Final[dict[str, Any]] = {  # Only youTube are relevant for now
     "type": str,
     "url": str,
 }
-REQUIRED_MEDIA_FIELDS: Final[set[str]] = {
-    "provider",
-    "type",
-    "url",
+MEDIA_FIELD_REQUIREMENTS: Final[dict[str, bool]] = {
+    "provider": True,
+    "type": True,
+    "url": True,
 }
 
 ARTIST_SPECS: Final[dict[str, Any]] = {
@@ -40,10 +40,12 @@ ARTIST_SPECS: Final[dict[str, Any]] = {
     "name": str,
     "url": str,
 }
-REQUIRED_ARTIST_FIELDS: Final[set[str]] = {
-    "id",
-    "name",
-    "url",
+ARTIST_FIELD_REQUIREMENTS: Final[dict[str, bool]] = {
+    "header_image_url": False,
+    "id": True,
+    "image_url": False,
+    "name": True,
+    "url": True,
 }
 
 ALBUM_SPECS: Final[dict[str, Any]] = {
@@ -54,12 +56,13 @@ ALBUM_SPECS: Final[dict[str, Any]] = {
     "url": str,
     "artist": ARTIST_SPECS,
 }
-REQUIRED_ALBUM_FIELDS: Final[set[str]] = {
-    "id",
-    "name",
-    "release_date_for_display",
-    "url",
-    "artist",
+ALBUM_FIELD_REQUIREMENTS: Final[dict[str, bool]] = {
+    "cover_art_url": False,
+    "id": True,
+    "name": True,
+    "release_date_for_display": True,
+    "url": True,
+    "artist": True,
 }
 
 SONG_SPECS: Final[dict[str, Any]] = {
@@ -79,13 +82,22 @@ SONG_SPECS: Final[dict[str, Any]] = {
     "album": ALBUM_SPECS,
     "media": [MEDIA_SPECS],
 }
-REQUIRED_SONG_FIELDS: Final[set[str]] = {
-    "id",
-    "release_date_for_display",
-    "title",
-    "url",
-    "primary_artist",
-    "album",
+SONG_FIELD_REQUIREMENTS: Final[dict[str, bool]] = {
+    "header_image_thumbnail_url": False,
+    "header_image_url": False,
+    "id": True,
+    "release_date_for_display": True,
+    "song_art_image_thumbnail_url": False,
+    "song_art_image_url": False,
+    "title": True,
+    "url": True,
+    "primary_artist": True,
+    "primary_artists": False,
+    "featured_artists": False,
+    "apple_music_id": False,
+    "language": False,
+    "album": True,
+    "media": False,
 }
 
 

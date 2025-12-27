@@ -229,9 +229,10 @@ class GeniusArtistInfo(GeniusEntity):
         song: GeniusSongInfo,
         simulate: bool = False,
     ) -> None:
-        entry_data = {}
-        entry_data[GeniusDiscographyEntry.get_artist_id_col_name()] = self.get_id()
-        entry_data[GeniusDiscographyEntry.get_song_id_col_name()] = song.get_id()
+        entry_data = GeniusDiscographyEntry.make_init_data(
+            artist_genius_id=self.get_id(),
+            song_genius_id=song.get_id(),
+        )
         entry = GeniusDiscographyEntry(data=entry_data)
         entry.insert_to_db(cur=cur, simulate=simulate)
 

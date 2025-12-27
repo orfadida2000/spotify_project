@@ -1,69 +1,48 @@
 from datetime import datetime
 from typing import Any
 
+from sp2genius.utils.normalization import filter_by_spec, validate_normalize_fields
+
 from .constants import (
+    ALBUM_FIELD_REQUIREMENTS,
     ALBUM_SPECS,
+    ARTIST_FIELD_REQUIREMENTS,
     ARTIST_SPECS,
+    MEDIA_FIELD_REQUIREMENTS,
     MEDIA_SPECS,
-    REQUIRED_ALBUM_FIELDS,
-    REQUIRED_ARTIST_FIELDS,
-    REQUIRED_MEDIA_FIELDS,
-    REQUIRED_SONG_FIELDS,
+    SONG_FIELD_REQUIREMENTS,
     SONG_SPECS,
     YOUTUBE_VIDEO_URL_RE,
 )
 
 
-def _validate_normalize_fields(
-    data: dict[str, Any],
-    field_specs: dict[str, Any],
-    required_fields: set[str],
-    entity_name: str,
-) -> None:
-    if not isinstance(data, dict):
-        raise TypeError(f"{entity_name} data must be a dictionary.")
-    for field, field_spec in field_specs.items():
-        field_type = field_spec if isinstance(field_spec, type) else type(field_spec)
-        if field not in data:
-            if field in required_fields:
-                raise ValueError(f"{entity_name} data must contain a '{field}' field.")
-            else:
-                continue
-        if not isinstance(data[field], field_type):
-            raise TypeError(
-                f"'{field}' field in {entity_name} data must be of type {field_type.__name__}."
-            )
-        data[field] = data[field].strip() if isinstance(data[field], str) else data[field]
-        if not data[field]:
-            if field in required_fields:
-                raise ValueError(f"'{field}' field in {entity_name} data must not be empty.")
+def _normalize_date(date_str: str, norm_date_format: str = "%Y-%m-%d") -> str:
+    d = datetime.strptime(date_str, "%B %d, %Y").date()
+    return d.strftime(norm_date_format)
 
 
-def _normalize_date(date_str: str) -> str:
-    dt = datetime.strptime(date_str, "%B %d, %Y")
-    return dt.date().isoformat()
-
-
-def _normalize_image_urls(image_url_lst: list[str]) -> str:
+def _normalize_image_urls(image_url_lst: list[str]) -> str | None:
     for url in image_url_lst:
+        # Extra safety, even though validate_normalize_fields should have already stripped it
         if url.strip():
             return url.strip()
-    return ""
+    return None
 
 
-def _normalize_media(media: dict[str, str]) -> dict[str, str]:
-    _validate_normalize_fields(
-        data=media,
-        field_specs=MEDIA_SPECS,
-        required_fields=REQUIRED_MEDIA_FIELDS,
+def _normalize_song_media(media: dict[str, str], is_filtered: bool = False) -> dict[str, str]:
+    filtered_media = media if is_filtered else filter_by_spec(media, MEDIA_SPECS)
+    norm_media = validate_normalize_fields(
+        filtered_data=filtered_media,
+        field_requirements=MEDIA_FIELD_REQUIREMENTS,
         entity_name="Media",
     )
-    norm_media = {k: v.strip() for k, v in media.items() if v}
     return norm_media
 
 
-def _normalize_media_lst(
-    media_lst: list[dict[str, str]], allowed_providers: set[str]
+def _normalize_song_media_lst(
+    media_lst: list[dict[str, str]],
+    allowed_providers: set[str],
+    is_filtered: bool = False,
 ) -> list[dict[str, str]]:
     if not isinstance(media_lst, list):
         raise TypeError("Media list must be a list of dictionaries.")
@@ -72,17 +51,17 @@ def _normalize_media_lst(
     normalized_lst = []
     allowed_providers = {p.strip().lower() for p in allowed_providers}
     for media in media_lst:
-        norm_media = _normalize_media(media)
+        norm_media = _normalize_song_media(media, is_filtered=is_filtered)
         provider = norm_media["provider"].lower()
         if provider in allowed_providers:
             normalized_lst.append(norm_media)
     return normalized_lst
 
 
-def _normalize_media_youtube(
-    media_lst: list[dict[str, str]],
+def _normalize_song_media_youtube(
+    media_lst: list[dict[str, str]], is_filtered: bool = False
 ) -> str | None:
-    norm_lst = _normalize_media_lst(media_lst, {"youtube"})
+    norm_lst = _normalize_song_media_lst(media_lst, {"youtube"}, is_filtered=is_filtered)
     if not norm_lst:
         return None
     youtube_url = norm_lst[0]["url"]
@@ -92,81 +71,86 @@ def _normalize_media_youtube(
     return match.group(1)
 
 
-def normalize_artist(artist_data: dict[str, Any]) -> dict[str, Any]:
-    _validate_normalize_fields(
-        data=artist_data,
-        field_specs=ARTIST_SPECS,
-        required_fields=REQUIRED_ARTIST_FIELDS,
+def normalize_artist(artist_data: dict[str, Any], is_filtered: bool = False) -> dict[str, Any]:
+    filtered_artist_data = artist_data if is_filtered else filter_by_spec(artist_data, ARTIST_SPECS)
+    norm_artist = validate_normalize_fields(
+        filtered_data=filtered_artist_data,
+        field_requirements=ARTIST_FIELD_REQUIREMENTS,
         entity_name="Artist",
     )
     final_img_url = _normalize_image_urls(
         [
-            artist_data.pop("image_url", ""),
-            artist_data.pop("header_image_url", ""),
+            norm_artist.pop("image_url", ""),
+            norm_artist.pop("header_image_url", ""),
         ]
     )
-    artist_data["image_url"] = final_img_url
-    norm_artist = {k: v for k, v in artist_data.items() if v}
+    if final_img_url:
+        norm_artist["image_url"] = final_img_url
     return norm_artist
 
 
-def normalize_album(album_data: dict[str, Any]) -> dict[str, Any]:
-    _validate_normalize_fields(
-        data=album_data,
-        field_specs=ALBUM_SPECS,
-        required_fields=REQUIRED_ALBUM_FIELDS,
+def normalize_album(album_data: dict[str, Any], is_filtered: bool = False) -> dict[str, Any]:
+    filtered_album_data = album_data if is_filtered else filter_by_spec(album_data, ALBUM_SPECS)
+    norm_album = validate_normalize_fields(
+        filtered_data=filtered_album_data,
+        field_requirements=ALBUM_FIELD_REQUIREMENTS,
         entity_name="Album",
     )
-    final_img_url = _normalize_image_urls([album_data.pop("cover_art_url", "")])
-    album_data["image_url"] = final_img_url
-    album_data["release_date"] = _normalize_date(album_data.pop("release_date_for_display"))
-    album_data["artist"] = normalize_artist(album_data["artist"])
-    album_data["title"] = album_data.pop("name")
-    norm_album = {k: v for k, v in album_data.items() if v}
+    final_img_url = _normalize_image_urls([norm_album.pop("cover_art_url", "")])
+    if final_img_url:
+        norm_album["image_url"] = final_img_url
+
+    norm_album["release_date"] = _normalize_date(norm_album.pop("release_date_for_display"))
+    norm_album["primary_artist"] = normalize_artist(norm_album.pop("artist"), is_filtered=True)
+    norm_album["title"] = norm_album.pop("name")
     return norm_album
 
 
-def normalize_song(song_data: dict[str, Any]) -> dict[str, Any]:
-    _validate_normalize_fields(
-        data=song_data,
-        field_specs=SONG_SPECS,
-        required_fields=REQUIRED_SONG_FIELDS,
+def normalize_song(song_data: dict[str, Any], is_filtered: bool = False) -> dict[str, Any]:
+    filtered_song_data = song_data if is_filtered else filter_by_spec(song_data, SONG_SPECS)
+    norm_song = validate_normalize_fields(
+        filtered_data=filtered_song_data,
+        field_requirements=SONG_FIELD_REQUIREMENTS,
         entity_name="Song",
     )
     final_img_url = _normalize_image_urls(
         image_url_lst=[
-            song_data.pop("song_art_image_url", ""),
-            song_data.pop("header_image_url", ""),
-            song_data.pop("song_art_image_thumbnail_url", ""),
-            song_data.pop("header_image_thumbnail_url", ""),
+            norm_song.pop("song_art_image_url", ""),
+            norm_song.pop("header_image_url", ""),
+            norm_song.pop("song_art_image_thumbnail_url", ""),
+            norm_song.pop("header_image_thumbnail_url", ""),
         ]
     )
-    song_data["image_url"] = final_img_url
-    song_data["release_date"] = _normalize_date(song_data.pop("release_date_for_display"))
-    song_data["primary_artist"] = normalize_artist(song_data["primary_artist"])
+    if final_img_url:
+        norm_song["image_url"] = final_img_url
 
-    all_artists_ids = {song_data["primary_artist"]["id"]}
-    all_artists = [song_data["primary_artist"]]
+    norm_song["release_date"] = _normalize_date(norm_song.pop("release_date_for_display"))
+    norm_song["primary_artist"] = normalize_artist(norm_song["primary_artist"], is_filtered=True)
 
-    for artist in song_data.pop("primary_artists", []):
-        norm_artist = normalize_artist(artist)
+    all_artists_ids = {norm_song["primary_artist"]["id"]}
+    all_artists = [norm_song["primary_artist"]]
+
+    for artist in norm_song.pop("primary_artists", []):
+        norm_artist = normalize_artist(artist, is_filtered=True)
         if norm_artist["id"] not in all_artists_ids:
             all_artists.append(norm_artist)
             all_artists_ids.add(norm_artist["id"])
 
-    for artist in song_data.pop("featured_artists", []):
-        norm_artist = normalize_artist(artist)
+    for artist in norm_song.pop("featured_artists", []):
+        norm_artist = normalize_artist(artist, is_filtered=True)
         if norm_artist["id"] not in all_artists_ids:
             all_artists.append(norm_artist)
             all_artists_ids.add(norm_artist["id"])
 
-    song_data["featured_artists"] = all_artists[1:] if len(all_artists) > 1 else []
+    norm_song["featured_artists"] = all_artists[1:] if len(all_artists) > 1 else []
 
-    youtube_video_id = _normalize_media_youtube(song_data.pop("media", []))
+    youtube_video_id = _normalize_song_media_youtube(norm_song.pop("media", []), is_filtered=True)
     if youtube_video_id:
-        song_data["youtube_video_id"] = youtube_video_id
+        norm_song["youtube_video_id"] = youtube_video_id
 
-    song_data["album"] = normalize_album(song_data["album"])
+    norm_song["album"] = normalize_album(norm_song["album"], is_filtered=True)
+    album_prim_artist = norm_song["album"]["primary_artist"]
+    if album_prim_artist["id"] not in all_artists_ids:
+        raise ValueError("Data inconsistency: Album's primary artist isn't among song artists")
 
-    norm_song = {k: v for k, v in song_data.items() if v}
     return norm_song

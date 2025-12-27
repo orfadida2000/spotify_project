@@ -4,27 +4,24 @@ from pathlib import Path
 
 import genius.manager as genius_manager
 import spotify.manager as spotify_manager
-
-from sp2genius.lyrics import insert
-from sp2genius.utils import err_msg
-from sp2genius.utils.path import get_absolute_path
-
-from . import DB_PATH
-from .entities import (
-    Album,
-    AlbumImage,
-    Artist,
-    ArtistImage,
-    DiscographyEntry,
+from genius.entities import (
     GeniusAlbumInfo,
     GeniusArtistInfo,
-    GeniusDiscographyEntry,
     GeniusSongInfo,
-    Song,
 )
+from spotify.entities import Album, AlbumImage, Artist, ArtistImage, Song
+
+from sp2genius.utils import err_msg
+from sp2genius.utils.path import get_absolute_path
+from tests.mro_test import D
+
+from . import DB_PATH
 from .schema import (
     CURRENT_SCHEMA_VERSION,
+    SCHEMA_META_ID_COLUMN,
     SCHEMA_META_TABLE,
+    SCHEMA_META_TABLE_NAME,
+    SCHEMA_META_VERSION_COLUMN,
     SQL_CREATE_STATEMENTS,
     SQL_PRAGMA_STATEMENT,
     VALID_SCHEMA_ID,
@@ -57,7 +54,7 @@ class DbManager:
         if self.conn is None:
             raise RuntimeError(err_msg("Database connection is not open."))
         try:
-            yield  # <-- the with-block runs here
+            yield self.conn
         except Exception:
             self.conn.rollback()  # <-- runs only if with-block raised
             raise
@@ -109,7 +106,7 @@ class DbManager:
 
             # Check current DB version
             row = conn.execute(
-                "SELECT version FROM schema_meta WHERE id = :id",
+                f"SELECT {SCHEMA_META_VERSION_COLUMN} FROM {SCHEMA_META_TABLE_NAME} WHERE {SCHEMA_META_ID_COLUMN} = :id",
                 {"id": VALID_SCHEMA_ID},
             ).fetchone()
 
@@ -117,7 +114,7 @@ class DbManager:
                 # Brand-new DB: create all tables and set version
                 conn.executescript(SQL_CREATE_STATEMENTS)
                 conn.execute(
-                    "INSERT INTO schema_meta (id, version) VALUES (:id, :version)",
+                    f"INSERT INTO {SCHEMA_META_TABLE_NAME} ({SCHEMA_META_ID_COLUMN}, {SCHEMA_META_VERSION_COLUMN}) VALUES (:id, :version)",
                     {"id": VALID_SCHEMA_ID, "version": CURRENT_SCHEMA_VERSION},
                 )
                 conn.commit()
@@ -152,9 +149,9 @@ class DbManager:
         album: tuple[Album, list[AlbumImage]],
         featured_artists: list[tuple[Artist, list[ArtistImage]]],
     ) -> None:
-        with self.transaction():
+        with self.transaction() as conn:
             spotify_manager.insert_spotify_song(
-                self.conn,  # type: ignore
+                conn,
                 song=song,
                 primary_artist=primary_artist,
                 album=album,
@@ -169,14 +166,83 @@ class DbManager:
         album: GeniusAlbumInfo,
         featured_artists: list[GeniusArtistInfo],
     ) -> None:
-        with self.transaction():
+        with self.transaction() as conn:
             genius_manager.insert_genius_song_info(
-                self.conn,  # type: ignore
+                conn,
                 song=song,
                 primary_artist=primary_artist,
                 album=album,
                 featured_artists=featured_artists,
             )
+
+    @staticmethod
+    def _normalize_string_for_comparison(s: str) -> str:
+        return s.strip().lower()
+
+    @staticmethod
+    def _validate_matching_song_data(
+        spotify_song: Song,
+        genius_song: GeniusSongInfo,
+        spotify_primary_artist: Artist,
+        genius_primary_artist: GeniusArtistInfo,
+    ) -> None:
+
+        match, (spotify_song_title, genius_song_title) = DbManager._matching_song_titles(
+            spotify_song=spotify_song,
+            genius_song=genius_song,
+        )
+        if not match:
+            raise ValueError(
+                err_msg(
+                    "The provided Spotify and Genius song titles do not match: "
+                    f"spotify:'{spotify_song_title}' != '{genius_song_title}':genius"
+                )
+            )
+
+        match, (spotify_primary_artist_name, genius_primary_artist_name) = DbManager._matching_artist_names(
+            spotify_artist=spotify_primary_artist,
+            genius_artist=genius_primary_artist,
+        )
+        if not match:
+            raise ValueError(
+                err_msg(
+                    "The provided Spotify and Genius primary artist names do not match: "
+                    f"spotify:'{spotify_primary_artist_name}' != '{genius_primary_artist_name}':genius"
+                )
+            )
+
+    @staticmethod
+    def _matching_album_titles(
+        spotify_album: Album,
+        genius_album: GeniusAlbumInfo,
+    ) -> tuple[bool, tuple[str, str]]:
+
+        genius_album_title = DbManager._normalize_string_for_comparison(genius_album.get_title())
+        spotify_album_title = DbManager._normalize_string_for_comparison(spotify_album.get_title())
+        return genius_album_title == spotify_album_title, (spotify_album_title, genius_album_title)
+
+    @staticmethod
+    def _matching_song_titles(
+        spotify_song: Song,
+        genius_song: GeniusSongInfo,
+    ) -> tuple[bool, tuple[str, str]]:
+
+        genius_song_title = DbManager._normalize_string_for_comparison(genius_song.get_title())
+        spotify_song_title = DbManager._normalize_string_for_comparison(spotify_song.get_title())
+        return genius_song_title == spotify_song_title, (spotify_song_title, genius_song_title)
+
+    @staticmethod
+    def _matching_artist_names(
+        spotify_artist: Artist,
+        genius_artist: GeniusArtistInfo,
+    ) -> tuple[bool, tuple[str, str]]:
+
+        genius_artist_name = DbManager._normalize_string_for_comparison(genius_artist.get_name())
+        spotify_artist_name = DbManager._normalize_string_for_comparison(spotify_artist.get_name())
+        return genius_artist_name == spotify_artist_name, (spotify_artist_name, genius_artist_name)
+    
+
+
 
     def insert_song(
         self,
@@ -219,10 +285,15 @@ class DbManager:
         elif insert_spotify_data and not insert_genius_data:
             self.insert_song_spotify_data(**spotify_data)
         else:
-            with self.transaction():
+            assert spotify_song is not None and genius_song is not None and spotify_primary_artist is not None and genius_primary_artist is not None
+            self._validate_matching_song_data(
+                spotify_song=spotify_song,
+                genius_song=genius_song,
+                spotify_primary_artist=spotify_primary_artist[0],
+                genius_primary_artist=genius_primary_artist,
+            )
+            with self.transaction() as conn:
                 genius_manager.insert_genius_song_info(
-                    self.conn,  # type: ignore
+                    conn,
                     **genius_data,
                 )
-                song_genius_id = genius_data["song"].get_id()
-                album_genius_id = genius_data["album"].get_id()
