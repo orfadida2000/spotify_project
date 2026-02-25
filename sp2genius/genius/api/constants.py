@@ -7,8 +7,7 @@ from typing import Any, Final
 from lyricsgenius.genius import ResponseFormatT
 
 from sp2genius.constants.path import ENV_DIR_PATH
-from sp2genius.utils.path import is_file
-from sp2genius.utils.typing import ReturnCode
+from sp2genius.utils.path import ReturnCode, is_file
 
 GENIUS_TOKEN_ENV_VAR: Final[str] = "GENIUS_API_TOKEN"
 

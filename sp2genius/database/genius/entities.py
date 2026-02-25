@@ -1,8 +1,7 @@
 import sqlite3
 
-from ..core.base import BinaryAssociationEntity, SinglePkEntity
-from ..core.constants import UNSET
-from ..core.typing import BasicFieldValue
+from ..core.entity.base import BinaryAssociationEntity, SinglePkEntity
+from ..core.typing import UNSET, BasicFieldValue
 from .tables import (
     GENIUS_ALBUM_INFO_TABLE_FOREIGN_KEYS,
     GENIUS_ALBUM_INFO_TABLE_META,

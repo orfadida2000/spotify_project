@@ -1,4 +1,5 @@
 import sqlite3
+from collections.abc import Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -11,9 +12,8 @@ from genius.entities import (
 )
 from spotify.entities import Album, AlbumImage, Artist, ArtistImage, Song
 
-from sp2genius.utils import err_msg
+from sp2genius.utils.errors import err_msg
 from sp2genius.utils.path import get_absolute_path
-from tests.mro_test import D
 
 from . import DB_PATH
 from .schema import (
@@ -28,7 +28,7 @@ from .schema import (
 )
 
 
-class DbManager:
+class Session:
     """
     Manages the SQLite database connection and ensures the schema is initialized.
 
@@ -145,9 +145,9 @@ class DbManager:
         self,
         *,
         song: Song,
-        primary_artist: tuple[Artist, list[ArtistImage]],
-        album: tuple[Album, list[AlbumImage]],
-        featured_artists: list[tuple[Artist, list[ArtistImage]]],
+        primary_artist: tuple[Artist, Sequence[ArtistImage]],
+        album: tuple[Album, Sequence[AlbumImage]],
+        featured_artists: Sequence[tuple[Artist, Sequence[ArtistImage]]],
     ) -> None:
         with self.transaction() as conn:
             spotify_manager.insert_spotify_song(
@@ -164,7 +164,7 @@ class DbManager:
         song: GeniusSongInfo,
         primary_artist: GeniusArtistInfo,
         album: GeniusAlbumInfo,
-        featured_artists: list[GeniusArtistInfo],
+        featured_artists: Sequence[GeniusArtistInfo],
     ) -> None:
         with self.transaction() as conn:
             genius_manager.insert_genius_song_info(
@@ -186,8 +186,7 @@ class DbManager:
         spotify_primary_artist: Artist,
         genius_primary_artist: GeniusArtistInfo,
     ) -> None:
-
-        match, (spotify_song_title, genius_song_title) = DbManager._matching_song_titles(
+        match, (spotify_song_title, genius_song_title) = Session._matching_song_titles(
             spotify_song=spotify_song,
             genius_song=genius_song,
         )
@@ -199,9 +198,11 @@ class DbManager:
                 )
             )
 
-        match, (spotify_primary_artist_name, genius_primary_artist_name) = DbManager._matching_artist_names(
-            spotify_artist=spotify_primary_artist,
-            genius_artist=genius_primary_artist,
+        match, (spotify_primary_artist_name, genius_primary_artist_name) = (
+            Session._matching_artist_names(
+                spotify_artist=spotify_primary_artist,
+                genius_artist=genius_primary_artist,
+            )
         )
         if not match:
             raise ValueError(
@@ -216,9 +217,8 @@ class DbManager:
         spotify_album: Album,
         genius_album: GeniusAlbumInfo,
     ) -> tuple[bool, tuple[str, str]]:
-
-        genius_album_title = DbManager._normalize_string_for_comparison(genius_album.get_title())
-        spotify_album_title = DbManager._normalize_string_for_comparison(spotify_album.get_title())
+        genius_album_title = Session._normalize_string_for_comparison(genius_album.get_title())
+        spotify_album_title = Session._normalize_string_for_comparison(spotify_album.get_title())
         return genius_album_title == spotify_album_title, (spotify_album_title, genius_album_title)
 
     @staticmethod
@@ -226,9 +226,8 @@ class DbManager:
         spotify_song: Song,
         genius_song: GeniusSongInfo,
     ) -> tuple[bool, tuple[str, str]]:
-
-        genius_song_title = DbManager._normalize_string_for_comparison(genius_song.get_title())
-        spotify_song_title = DbManager._normalize_string_for_comparison(spotify_song.get_title())
+        genius_song_title = Session._normalize_string_for_comparison(genius_song.get_title())
+        spotify_song_title = Session._normalize_string_for_comparison(spotify_song.get_title())
         return genius_song_title == spotify_song_title, (spotify_song_title, genius_song_title)
 
     @staticmethod
@@ -236,25 +235,42 @@ class DbManager:
         spotify_artist: Artist,
         genius_artist: GeniusArtistInfo,
     ) -> tuple[bool, tuple[str, str]]:
-
-        genius_artist_name = DbManager._normalize_string_for_comparison(genius_artist.get_name())
-        spotify_artist_name = DbManager._normalize_string_for_comparison(spotify_artist.get_name())
+        genius_artist_name = Session._normalize_string_for_comparison(genius_artist.get_name())
+        spotify_artist_name = Session._normalize_string_for_comparison(spotify_artist.get_name())
         return genius_artist_name == spotify_artist_name, (spotify_artist_name, genius_artist_name)
-    
 
+    @staticmethod
+    def _get_matching_artist_list(
+        spotify_artists: Sequence[Artist],
+        genius_artists: Sequence[GeniusArtistInfo],
+    ) -> list[tuple[Artist, GeniusArtistInfo]]:
+        matches: list[tuple[Artist, GeniusArtistInfo]] = []
+        matches_dict = {}
+        for spotify_artist in spotify_artists:
+            norm_name = Session._normalize_string_for_comparison(spotify_artist.get_name())
+            if norm_name not in matches_dict:
+                matches_dict[norm_name] = spotify_artist
 
+        for genius_artist in genius_artists:
+            norm_name = Session._normalize_string_for_comparison(genius_artist.get_name())
+            if norm_name in matches_dict:
+                match_artist = matches_dict[norm_name]
+                matches.append((match_artist, genius_artist))
+                matches_dict.pop(norm_name)
+
+        return matches
 
     def insert_song(
         self,
         *,
         spotify_song: Song | None = None,
-        spotify_primary_artist: tuple[Artist, list[ArtistImage]] | None = None,
-        spotify_album: tuple[Album, list[AlbumImage]] | None = None,
-        spotify_featured_artists: list[tuple[Artist, list[ArtistImage]]] | None = None,
+        spotify_primary_artist: tuple[Artist, Sequence[ArtistImage]] | None = None,
+        spotify_album: tuple[Album, Sequence[AlbumImage]] | None = None,
+        spotify_featured_artists: Sequence[tuple[Artist, Sequence[ArtistImage]]] | None = None,
         genius_song: GeniusSongInfo | None = None,
         genius_primary_artist: GeniusArtistInfo | None = None,
         genius_album: GeniusAlbumInfo | None = None,
-        genius_featured_artists: list[GeniusArtistInfo] | None = None,
+        genius_featured_artists: Sequence[GeniusArtistInfo] | None = None,
     ):
         spotify_data = {
             "song": spotify_song,
@@ -285,15 +301,45 @@ class DbManager:
         elif insert_spotify_data and not insert_genius_data:
             self.insert_song_spotify_data(**spotify_data)
         else:
-            assert spotify_song is not None and genius_song is not None and spotify_primary_artist is not None and genius_primary_artist is not None
+            assert (
+                spotify_song is not None
+                and genius_song is not None
+                and spotify_primary_artist is not None
+                and genius_primary_artist is not None
+                and spotify_album is not None
+                and genius_album is not None
+                and spotify_featured_artists is not None
+                and genius_featured_artists is not None
+            )
+            # Validate matching data (titles, primary artists) before inserting. Raise error if mismatch.
             self._validate_matching_song_data(
                 spotify_song=spotify_song,
                 genius_song=genius_song,
                 spotify_primary_artist=spotify_primary_artist[0],
                 genius_primary_artist=genius_primary_artist,
             )
+            spotify_primary_artist[0].set_genius_id(genius_primary_artist.get_id())
+
+            matching_albums = self._matching_album_titles(
+                spotify_album=spotify_album[0],
+                genius_album=genius_album,
+            )[0]
+            if matching_albums:
+                spotify_album[0].set_genius_id(genius_album.get_id())
+
+            matching_featured_artists = self._get_matching_artist_list(
+                spotify_artists=[fa[0] for fa in spotify_featured_artists],
+                genius_artists=genius_featured_artists,
+            )
+            for spotify_artist, genius_artist in matching_featured_artists:
+                spotify_artist.set_genius_id(genius_artist.get_id())
+
             with self.transaction() as conn:
                 genius_manager.insert_genius_song_info(
                     conn,
                     **genius_data,
+                )
+                spotify_manager.insert_spotify_song(
+                    conn,
+                    **spotify_data,
                 )

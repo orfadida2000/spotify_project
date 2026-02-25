@@ -10,13 +10,13 @@ from sp2genius.constants.text import EM_DASHES
 from sp2genius.genius.api.client import genius_url_for_title_artists
 from sp2genius.lyrics.argparse import normalize_artist_list, normalize_song_title
 from sp2genius.utils.path import (
+    ReturnCode,
     is_dir,
     is_file,
     is_readable_dir,
     is_readable_file,
     is_writable_dir,
 )
-from sp2genius.utils.typing import ReturnCode
 
 from .typing import AUDIO_EXTS, SearchOutcome, SearchSummary
 

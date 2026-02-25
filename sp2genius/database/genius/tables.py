@@ -1,6 +1,7 @@
 from typing import Final
 
-from ..core.constants import CONCAT
+from ..core.sql import CONCAT, STRICT_TABLES
+from ..core.sql.utils import CHECK_BASE64_URL_SAFE_GLOB, CHECK_ISO_FULL_DATE_GLOB
 from ..core.typing import (
     CreateStatement,
     FieldMeta,
@@ -9,7 +10,6 @@ from ..core.typing import (
     TableMeta,
     TableName,
 )
-from ..core.utils import CHECK_BASE64_URL_SAFE_GLOB, CHECK_ISO_FULL_DATE_GLOB
 
 
 # ---- UTILS ---- #
@@ -18,6 +18,7 @@ def youtube_video_id_to_url(column: str, concat: str) -> str:
 
 
 # ---- GENIUS TABLES + EXTENDED METADATA ---- #
+_strict_clause: str = " STRICT" if STRICT_TABLES else ""
 
 # Genius Artist Info Table
 GENIUS_ARTIST_INFO_TABLE_NAME: Final[TableName] = "genius_artist_info"
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS {GENIUS_ARTIST_INFO_TABLE_NAME} (
                     CHECK (genius_url <> ''),
     image_url   TEXT
                     CHECK (image_url IS NULL OR image_url <> '')
-) STRICT;
+){_strict_clause};
 """
 GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("genius_id",)
 GENIUS_ARTIST_INFO_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {}
@@ -61,7 +62,7 @@ CREATE TABLE IF NOT EXISTS {GENIUS_ALBUM_INFO_TABLE_NAME} (
     FOREIGN KEY (primary_artist_genius_id)
         REFERENCES {GENIUS_ARTIST_INFO_TABLE_NAME}({GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT
-) STRICT;
+){_strict_clause};
 """
 GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("genius_id",)
 GENIUS_ALBUM_INFO_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
@@ -120,7 +121,7 @@ CREATE TABLE IF NOT EXISTS {GENIUS_SONG_INFO_TABLE_NAME} (
     FOREIGN KEY (album_genius_id)
         REFERENCES {GENIUS_ALBUM_INFO_TABLE_NAME}({GENIUS_ALBUM_INFO_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT
-) STRICT;
+){_strict_clause};
 """
 GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("genius_id",)
 GENIUS_SONG_INFO_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
@@ -160,7 +161,7 @@ CREATE TABLE IF NOT EXISTS {GENIUS_DISCOGRAPHY_TABLE_NAME} (
     FOREIGN KEY (song_genius_id)
         REFERENCES {GENIUS_SONG_INFO_TABLE_NAME}({GENIUS_SONG_INFO_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
-) STRICT;
+){_strict_clause};
 """
 GENIUS_DISCOGRAPHY_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = (
     "artist_genius_id",

@@ -1,6 +1,7 @@
 import sqlite3
+from collections.abc import Sequence
 
-from sp2genius.utils import err_msg
+from sp2genius.utils.errors import err_msg
 
 from .entities import GeniusAlbumInfo, GeniusArtistInfo, GeniusDiscographyEntry, GeniusSongInfo
 
@@ -8,7 +9,7 @@ from .entities import GeniusAlbumInfo, GeniusArtistInfo, GeniusDiscographyEntry,
 def _ensure_discography_entries(
     cur: sqlite3.Cursor,
     song: GeniusSongInfo,
-    artists: list[GeniusArtistInfo],
+    artists: Sequence[GeniusArtistInfo],
 ) -> None:
     for artist in artists:
         artist.register_discography_entry(cur, song)
@@ -21,7 +22,7 @@ def insert_genius_song_info(
     song: GeniusSongInfo,
     primary_artist: GeniusArtistInfo,
     album: GeniusAlbumInfo,
-    featured_artists: list[GeniusArtistInfo],
+    featured_artists: Sequence[GeniusArtistInfo],
 ) -> None:
     """
     Insert or patch a song, its main artist, album, and discography entries.
@@ -37,7 +38,7 @@ def insert_genius_song_info(
     for feat_artist in featured_artists:
         feat_artist.upsert_to_db(cur)
 
-    all_artists = [primary_artist] + featured_artists
+    all_artists = [primary_artist] + list(featured_artists)
 
     # 3. album (patch or insert)
     if album.get_id() != song.get_album_id():
@@ -76,14 +77,14 @@ def get_songs_for_artist(
         if not artist.exists_in_db(cur):
             raise ValueError(
                 err_msg(
-                    f"Artist '{artist.get_id()}' does not exist in table '{GeniusArtistInfo.TABLE_NAME}'."
+                    f"Artist '{artist.get_id()}' does not exist in table '{GeniusArtistInfo.get_table_name()}'."
                 )
             )
 
     cur.execute(
         f"""
         SELECT {GeniusDiscographyEntry.get_song_id_col_name()}
-        FROM {GeniusDiscographyEntry.TABLE_NAME}
+        FROM {GeniusDiscographyEntry.get_table_name()}
         WHERE {GeniusDiscographyEntry.get_artist_id_col_name()} = :aid
         """,
         {"aid": artist.get_id()},
@@ -94,7 +95,7 @@ def get_songs_for_artist(
 
 def get_joint_songs_for_artists(
     conn: sqlite3.Connection,
-    artists: list[GeniusArtistInfo],
+    artists: Sequence[GeniusArtistInfo],
     strict: bool = False,
 ) -> list[sqlite3.Row]:
     """
@@ -105,7 +106,7 @@ def get_joint_songs_for_artists(
     - Then fetches full rows from the songs table.
     - Result is sorted by: main_artist_id, then album_id, then title.
     """
-    assert isinstance(artists, list), err_msg("artists must be a list of Artist objects")
+    assert isinstance(artists, Sequence), err_msg("artists must be a sequence of Artist objects")
     if not artists:
         return []
 
@@ -132,7 +133,7 @@ def get_joint_songs_for_artists(
     cur.execute(
         f"""
         SELECT *
-        FROM {GeniusSongInfo.TABLE_NAME}
+        FROM {GeniusSongInfo.get_table_name()}
         WHERE {GeniusSongInfo.get_id_col_name()} IN ({placeholders})
         """,
         song_list,

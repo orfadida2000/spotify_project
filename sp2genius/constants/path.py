@@ -2,8 +2,7 @@ from pathlib import Path
 from typing import Final
 
 from sp2genius import TOP_PKG_ABS_PATH
-from sp2genius.utils.path import is_dir
-from sp2genius.utils.typing import ReturnCode
+from sp2genius.utils.path import ReturnCode, is_dir
 
 from .core import IS_A_SHELL
 

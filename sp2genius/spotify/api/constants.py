@@ -5,8 +5,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from sp2genius.constants.path import ENV_DIR_PATH
-from sp2genius.utils.path import is_file
-from sp2genius.utils.typing import ReturnCode
+from sp2genius.utils.path import ReturnCode, is_file
 
 SPOTIFY_ID_RE: Final[re.Pattern[str]] = re.compile(pattern=r"[A-Za-z0-9]{22}")
 SPOTIFY_TRACK_URL_RE: Final[re.Pattern[str]] = re.compile(

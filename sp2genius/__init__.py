@@ -1,8 +1,7 @@
 from pathlib import Path
 from typing import Final
 
-from sp2genius.utils.path import is_file
-from sp2genius.utils.typing import ReturnCode
+from sp2genius.utils.path import ReturnCode, is_file
 
 DEBUG_MODE: Final[bool] = False
 SIMULATE_MODE: Final[bool] = False

@@ -1,6 +1,12 @@
 from typing import Final
 
-from ..core.constants import CONCAT
+from ..core.sql import CONCAT, STRICT_TABLES
+from ..core.sql.utils import (
+    CHECK_ALPHANUMERIC_GLOB,
+    CHECK_ISO_FULL_DATE_GLOB,
+    CHECK_ISO_YEAR_GLOB,
+    CHECK_ISO_YEAR_MONTH_GLOB,
+)
 from ..core.typing import (
     CreateStatement,
     FieldMeta,
@@ -8,12 +14,6 @@ from ..core.typing import (
     PrimaryKeyNames,
     TableMeta,
     TableName,
-)
-from ..core.utils import (
-    CHECK_ALPHANUMERIC_GLOB,
-    CHECK_ISO_FULL_DATE_GLOB,
-    CHECK_ISO_YEAR_GLOB,
-    CHECK_ISO_YEAR_MONTH_GLOB,
 )
 from ..genius.tables import (
     GENIUS_ALBUM_INFO_TABLE_NAME,
@@ -54,6 +54,7 @@ def CHECK_SPOTIFY_ID_GLOB(id: str) -> str:  # noqa: N802
 
 
 # ---- SPOTIFY TABLES + EXTENDED METADATA ---- #
+_strict_clause: str = " STRICT" if STRICT_TABLES else ""
 
 # Artists Table
 ARTISTS_TABLE_NAME: Final[TableName] = "artists"
@@ -78,7 +79,7 @@ CREATE TABLE IF NOT EXISTS {ARTISTS_TABLE_NAME} (
     FOREIGN KEY (genius_id)
         REFERENCES {GENIUS_ARTIST_INFO_TABLE_NAME}({GENIUS_ARTIST_INFO_TABLE_PRIMARY_KEYS[0]})
         ON DELETE SET NULL
-) STRICT;
+){_strict_clause};
 """
 ARTISTS_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("artist_id",)
 ARTISTS_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
@@ -138,7 +139,7 @@ CREATE TABLE IF NOT EXISTS {ALBUMS_TABLE_NAME} (
     FOREIGN KEY (primary_artist_id)
         REFERENCES {ARTISTS_TABLE_NAME}({ARTISTS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT
-) STRICT;
+){_strict_clause};
 """
 ALBUMS_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("album_id",)
 ALBUMS_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
@@ -198,7 +199,7 @@ CREATE TABLE IF NOT EXISTS {SONGS_TABLE_NAME} (
     FOREIGN KEY (album_id)
         REFERENCES {ALBUMS_TABLE_NAME}({ALBUMS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE RESTRICT
-) STRICT;
+){_strict_clause};
 """
 SONGS_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("track_id",)
 SONGS_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
@@ -241,7 +242,7 @@ CREATE TABLE IF NOT EXISTS {DISCOGRAPHY_TABLE_NAME} (
     FOREIGN KEY (track_id)
         REFERENCES {SONGS_TABLE_NAME}({SONGS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
-) STRICT;
+){_strict_clause};
 """
 DISCOGRAPHY_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("artist_id", "track_id")
 DISCOGRAPHY_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
@@ -277,7 +278,7 @@ CREATE TABLE IF NOT EXISTS {ARTIST_IMAGES_TABLE_NAME} (
     FOREIGN KEY (artist_id)
         REFERENCES {ARTISTS_TABLE_NAME}({ARTISTS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
-) STRICT;
+){_strict_clause};
 """
 ARTIST_IMAGES_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("artist_id", "url")
 ARTIST_IMAGES_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {
@@ -312,7 +313,7 @@ CREATE TABLE IF NOT EXISTS {ALBUM_IMAGES_TABLE_NAME} (
     FOREIGN KEY (album_id)
         REFERENCES {ALBUMS_TABLE_NAME}({ALBUMS_TABLE_PRIMARY_KEYS[0]})
         ON DELETE CASCADE
-) STRICT;
+){_strict_clause};
 """
 ALBUM_IMAGES_TABLE_PRIMARY_KEYS: Final[PrimaryKeyNames] = ("album_id", "url")
 ALBUM_IMAGES_TABLE_FOREIGN_KEYS: Final[ForeignKeyMapping] = {

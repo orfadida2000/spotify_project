@@ -1,9 +1,9 @@
 from typing import Final
 
-from .core.constants import FOREIGN_KEYS
-from .core.typing import CreateStatement
-from .genius.tables import TABLES as GENIUS_TABLES
-from .spotify.tables import TABLES as SPOTIFY_TABLES
+from ..genius import GENIUS_TABLES
+from ..spotify import SPOTIFY_TABLES
+from .sql import FOREIGN_KEYS, STRICT_TABLES
+from .typing import CreateStatement
 
 SQL_PRAGMA_STATEMENT: Final[str] = f"PRAGMA foreign_keys = {'ON' if FOREIGN_KEYS else 'OFF'};"
 
@@ -13,11 +13,13 @@ SCHEMA_META_TABLE_NAME: Final[str] = "schema_meta"
 SCHEMA_META_ID_COLUMN: Final[str] = "id"
 SCHEMA_META_VERSION_COLUMN: Final[str] = "version"
 VALID_SCHEMA_ID: Final[int] = 1
+
+_strict_clause: str = " STRICT" if STRICT_TABLES else ""
 SCHEMA_META_TABLE: Final[CreateStatement] = f"""
 CREATE TABLE IF NOT EXISTS {SCHEMA_META_TABLE_NAME} (
     {SCHEMA_META_ID_COLUMN}      INTEGER PRIMARY KEY CHECK ({SCHEMA_META_ID_COLUMN} = {VALID_SCHEMA_ID}),
     {SCHEMA_META_VERSION_COLUMN} INTEGER NOT NULL CHECK ({SCHEMA_META_VERSION_COLUMN} >= 0)
-) STRICT;
+){_strict_clause};
 """
 
 

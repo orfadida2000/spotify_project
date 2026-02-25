@@ -1,10 +1,10 @@
 import sqlite3
 
-from sp2genius.utils import err_msg
+from sp2genius.database.core.sql.fragments import generate_order_by_clause
+from sp2genius.utils.errors import err_msg
 
-from ..core.base import BinaryAssociationEntity, DependentRowEntity, SinglePkEntity
-from ..core.constants import UNSET
-from ..core.typing import BasicFieldValue
+from ..core.entity.base import BinaryAssociationEntity, DependentRowEntity, SinglePkEntity
+from ..core.typing import UNSET, BasicFieldValue
 from ..genius.entities import GeniusAlbumInfo, GeniusArtistInfo, GeniusEntity, GeniusSongInfo
 from .tables import (
     ALBUM_IMAGES_TABLE_FOREIGN_KEYS,
@@ -413,6 +413,15 @@ class Song(SpotifyEntity):
         track_number_col_name = self.get_track_number_col_name()
         self.set_field_value(track_number_col_name, new_track_number)
 
+    @classmethod
+    def get_order_by_cols(cls) -> list[str]:
+        return [
+            cls.get_primary_artist_id_col_name(),
+            cls.get_album_id_col_name(),
+            cls.get_disc_number_col_name(),
+            cls.get_track_number_col_name(),
+        ]
+
 
 class DiscographyEntry(BinaryAssociationEntity):
     TABLE_META = DISCOGRAPHY_TABLE_META
@@ -533,3 +542,36 @@ class Artist(SpotifyEntity):
     def set_name(self, new_name: str) -> None:
         name_col_name = self.get_name_col_name()
         self.set_field_value(name_col_name, new_name)
+
+    def get_all_songs(
+        self,
+        cur: sqlite3.Cursor,
+        *,
+        order_by: bool = True,
+        check_existence: bool = False,
+    ) -> list[sqlite3.Row]:
+        if check_existence:
+            if not self.exists_in_db(cur):
+                raise ValueError(
+                    err_msg(f"Artist '{self.get_id()}' does not exist in table 'artists'.")
+                )
+
+        order_by_cols = Song.get_order_by_cols()
+        order_clause = generate_order_by_clause("s", order_by_cols) if order_by else ""
+
+        sql = f"""
+            SELECT s.*
+            FROM {Song.get_table_name()} AS s
+            JOIN {DiscographyEntry.get_table_name()} AS d
+              ON d.{DiscographyEntry.get_song_id_col_name()} = s.{Song.get_id_col_name()}
+            WHERE d.{DiscographyEntry.get_artist_id_col_name()} = :aid
+            {order_clause};
+        """
+        old_row_factory = cur.row_factory
+        cur.row_factory = sqlite3.Row  # type: ignore
+        try:
+            cur.execute(sql, {"aid": self.get_id()})
+        finally:
+            cur.row_factory = old_row_factory
+
+        return cur.fetchall()
